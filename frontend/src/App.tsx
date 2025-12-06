@@ -753,9 +753,7 @@ function App() {
       if (f.id !== fileId) return f;
 
       // Generate points for default duration (0.4s)
-      console.log('Generating points for 0.4s');
       const initialPoints = resamplePath(DEFAULT_COMMAND_POINTS, 0.4);
-      console.log('Generated points count:', initialPoints.length);
 
       const newCommand: Command = {
         id: crypto.randomUUID(),
@@ -764,7 +762,6 @@ function App() {
         isVisible: true,
         duration: 0.4
       };
-      console.log('New command duration:', newCommand.duration);
       return {
         ...f,
         commands: [...f.commands, newCommand],
@@ -860,15 +857,11 @@ function App() {
     setFiles(prev => prev.map(f => {
       if (f.id === fileId) {
         const cmd = f.commands.find(c => c.id === commandId);
-        if (cmd) {
-          console.log('Selected command:', cmd.id, 'Duration:', cmd.duration);
-        }
         if (cmd && cmd.duration !== undefined) {
           setDuration(cmd.duration);
         } else {
           // Default duration if not set (e.g. for paths, maybe keep 1.0 or calculate?)
           // Also update global duration state to match new command
-          console.log('Command has no duration, defaulting to 0.4');
           setDuration(0.4);
         }
         return { ...f, selectedCommandId: commandId };
