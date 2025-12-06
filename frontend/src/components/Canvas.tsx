@@ -149,34 +149,55 @@ const Canvas: React.FC<CanvasProps> = ({ paths, width = 1180, height = 820, back
                     ctx.lineWidth = path.isSelected ? 4 : 2;
                     ctx.stroke();
 
-                    // Draw Start/End Points for selected path
-                    if (path.isSelected) {
-                        // Start Point (Green)
-                        ctx.fillStyle = '#10B981';
-                        ctx.beginPath();
-                        ctx.arc(path.points[0].x, path.points[0].y, 6, 0, Math.PI * 2);
-                        ctx.fill();
+                    ctx.stroke();
 
-                        // End Point (Red)
-                        ctx.fillStyle = '#EF4444';
-                        ctx.beginPath();
-                        ctx.arc(path.points[path.points.length - 1].x, path.points[path.points.length - 1].y, 6, 0, Math.PI * 2);
-                        ctx.fill();
-                    }
+                    // Draw Start/End Points (Always visible)
+                    const pointRadius = path.isSelected ? 6 : 4; // Smaller for non-selected
 
-                    // Draw Label at Start Point
+                    // Start Point (Green)
+                    ctx.fillStyle = '#10B981';
+                    ctx.beginPath();
+                    ctx.arc(path.points[0].x, path.points[0].y, pointRadius, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // End Point (Red)
+                    ctx.fillStyle = '#EF4444';
+                    ctx.beginPath();
+                    ctx.arc(path.points[path.points.length - 1].x, path.points[path.points.length - 1].y, pointRadius, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Draw Label at Start Point (offset opposite to direction)
                     if (path.label) {
+                        const p0 = path.points[0];
+                        let labelX = p0.x;
+                        let labelY = p0.y - 25; // Default offset (up)
+
+                        if (path.points.length > 1) {
+                            const p1 = path.points[1];
+                            const dx = p1.x - p0.x;
+                            const dy = p1.y - p0.y;
+                            const len = Math.sqrt(dx * dx + dy * dy);
+                            if (len > 0) {
+                                // Normalize and negate to get "backward" direction
+                                const dirX = -(dx / len);
+                                const dirY = -(dy / len);
+                                // Offset by 25px
+                                labelX = p0.x + dirX * 25;
+                                labelY = p0.y + dirY * 25;
+                            }
+                        }
+
                         ctx.fillStyle = 'white'; // Text color
                         ctx.font = 'bold 14px sans-serif'; // Larger font
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
                         // Draw background circle for label
                         ctx.beginPath();
-                        ctx.arc(path.points[0].x, path.points[0].y - 20, 10, 0, Math.PI * 2); // Position above start point
+                        ctx.arc(labelX, labelY, 10, 0, Math.PI * 2);
                         ctx.fillStyle = path.color;
                         ctx.fill();
                         ctx.fillStyle = 'white';
-                        ctx.fillText(path.label, path.points[0].x, path.points[0].y - 20);
+                        ctx.fillText(path.label, labelX, labelY);
                     }
                 }
                 ctx.globalAlpha = 1.0; // Reset alpha
