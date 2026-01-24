@@ -70,7 +70,8 @@ from parser import create_combined_plist
 
 class CommandData(BaseModel):
     name: str
-    points: List[Point]
+    points: List[Point] = []
+    strokes: List[List[Point]] = None
     duration: float = None
 
 class ExportMergedRequest(BaseModel):
@@ -82,10 +83,13 @@ async def export_merged(request: ExportMergedRequest):
         # Convert Pydantic models to dicts for the parser
         commands_list = []
         for cmd in request.commands:
-            commands_list.append({
+            cmd_dict = {
                 'name': cmd.name,
                 'points': [{'x': p.x, 'y': p.y} for p in cmd.points]
-            })
+            }
+            if cmd.strokes:
+                cmd_dict['strokes'] = [[{'x': p.x, 'y': p.y} for p in stroke] for stroke in cmd.strokes]
+            commands_list.append(cmd_dict)
             
         plist_bytes = create_combined_plist(commands_list)
         
