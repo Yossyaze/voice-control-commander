@@ -7,8 +7,12 @@ export interface Command {
     id: string;
     name: string;
     points: Point[];
+    strokes: Point[][];
+    strokeMetadata?: { waitAfter?: number }[]; // Metadata corresponding to each stroke
     isVisible?: boolean;
     duration?: number;
+    waitDuration?: number; // Wait time between strokes in seconds (Global default)
+    color?: string; // Color assigned to the command
 }
 
 export interface ParseResult {

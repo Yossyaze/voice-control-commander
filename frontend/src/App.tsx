@@ -1,26 +1,106 @@
 
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import Canvas from './components/Canvas';
 import ControlPanel from './components/ControlPanel';
 import Sidebar from './components/Sidebar';
 import { parseFile, API_BASE_URL } from './api';
-import type { Point, VoiceControlFile, Command } from './api';
+import type { Point, Command } from './api';
 
-const DEVICES = [
-  { id: 'ipad_air_4_landscape', name: 'iPad Air 4 (横持ち)', width: 1180, height: 820 },
-  { id: 'iphone_13_portrait', name: 'iPhone 13 (縦持ち)', width: 390, height: 844 },
-  { id: 'iphone_13_landscape', name: 'iPhone 13 (横持ち)', width: 844, height: 390 },
+// Define Device Model Interface
+interface DeviceModel {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  category: 'iPhone' | 'iPad';
+}
+
+// Comprehensive List of Apple Devices
+const DEVICE_MODELS: DeviceModel[] = [
+  // iPhone 16 Series
+  { id: 'iphone_16_pro_max', name: 'iPhone 16 Pro Max', width: 440, height: 956, category: 'iPhone' },
+  { id: 'iphone_16_pro', name: 'iPhone 16 Pro', width: 402, height: 874, category: 'iPhone' },
+  { id: 'iphone_16_plus', name: 'iPhone 16 Plus', width: 430, height: 932, category: 'iPhone' },
+  { id: 'iphone_16', name: 'iPhone 16', width: 393, height: 852, category: 'iPhone' },
+
+  // iPhone 15 Series
+  { id: 'iphone_15_pro_max', name: 'iPhone 15 Pro Max', width: 430, height: 932, category: 'iPhone' },
+  { id: 'iphone_15_pro', name: 'iPhone 15 Pro', width: 393, height: 852, category: 'iPhone' },
+  { id: 'iphone_15_plus', name: 'iPhone 15 Plus', width: 430, height: 932, category: 'iPhone' },
+  { id: 'iphone_15', name: 'iPhone 15', width: 393, height: 852, category: 'iPhone' },
+
+  // iPhone 14 Series
+  { id: 'iphone_14_pro_max', name: 'iPhone 14 Pro Max', width: 430, height: 932, category: 'iPhone' },
+  { id: 'iphone_14_pro', name: 'iPhone 14 Pro', width: 393, height: 852, category: 'iPhone' },
+  { id: 'iphone_14_plus', name: 'iPhone 14 Plus', width: 428, height: 926, category: 'iPhone' },
+  { id: 'iphone_14', name: 'iPhone 14', width: 390, height: 844, category: 'iPhone' },
+
+  // iPhone 13 Series
+  { id: 'iphone_13_pro_max', name: 'iPhone 13 Pro Max', width: 428, height: 926, category: 'iPhone' },
+  { id: 'iphone_13_pro', name: 'iPhone 13 Pro', width: 390, height: 844, category: 'iPhone' },
+  { id: 'iphone_13', name: 'iPhone 13', width: 390, height: 844, category: 'iPhone' },
+  { id: 'iphone_13_mini', name: 'iPhone 13 mini', width: 375, height: 812, category: 'iPhone' },
+
+  // iPhone 12 Series
+  { id: 'iphone_12_pro_max', name: 'iPhone 12 Pro Max', width: 428, height: 926, category: 'iPhone' },
+  { id: 'iphone_12_pro', name: 'iPhone 12 Pro', width: 390, height: 844, category: 'iPhone' },
+  { id: 'iphone_12', name: 'iPhone 12', width: 390, height: 844, category: 'iPhone' },
+  { id: 'iphone_12_mini', name: 'iPhone 12 mini', width: 375, height: 812, category: 'iPhone' },
+
+  // iPhone 11 Series
+  { id: 'iphone_11_pro_max', name: 'iPhone 11 Pro Max', width: 414, height: 896, category: 'iPhone' },
+  { id: 'iphone_11_pro', name: 'iPhone 11 Pro', width: 375, height: 812, category: 'iPhone' },
+  { id: 'iphone_11', name: 'iPhone 11', width: 414, height: 896, category: 'iPhone' },
+
+  // iPhone XS/XR/X
+  { id: 'iphone_xs_max', name: 'iPhone XS Max', width: 414, height: 896, category: 'iPhone' },
+  { id: 'iphone_xs', name: 'iPhone XS', width: 375, height: 812, category: 'iPhone' },
+  { id: 'iphone_xr', name: 'iPhone XR', width: 414, height: 896, category: 'iPhone' },
+  { id: 'iphone_x', name: 'iPhone X', width: 375, height: 812, category: 'iPhone' },
+
+  // iPhone 8/7/SE
+  { id: 'iphone_8_plus', name: 'iPhone 8 Plus', width: 414, height: 736, category: 'iPhone' },
+  { id: 'iphone_8', name: 'iPhone 8', width: 375, height: 667, category: 'iPhone' },
+  { id: 'iphone_7_plus', name: 'iPhone 7 Plus', width: 414, height: 736, category: 'iPhone' },
+  { id: 'iphone_7', name: 'iPhone 7', width: 375, height: 667, category: 'iPhone' },
+  { id: 'iphone_se_3', name: 'iPhone SE (3rd gen)', width: 375, height: 667, category: 'iPhone' },
+  { id: 'iphone_se_2', name: 'iPhone SE (2nd gen)', width: 375, height: 667, category: 'iPhone' },
+  
+  // iPad Pro
+  { id: 'ipad_pro_13_m4', name: 'iPad Pro 13" (M4)', width: 1032, height: 1376, category: 'iPad' },
+  { id: 'ipad_pro_12_9_6', name: 'iPad Pro 12.9" (3rd-6th gen)', width: 1024, height: 1366, category: 'iPad' },
+  { id: 'ipad_pro_12_9_2', name: 'iPad Pro 12.9" (1st-2nd gen)', width: 1024, height: 1366, category: 'iPad' },
+  { id: 'ipad_pro_11_m4', name: 'iPad Pro 11" (M4)', width: 834, height: 1210, category: 'iPad' },
+  { id: 'ipad_pro_11_4', name: 'iPad Pro 11" (1st-4th gen)', width: 834, height: 1194, category: 'iPad' },
+  { id: 'ipad_pro_10_5', name: 'iPad Pro 10.5"', width: 834, height: 1112, category: 'iPad' },
+  { id: 'ipad_pro_9_7', name: 'iPad Pro 9.7"', width: 768, height: 1024, category: 'iPad' },
+
+  // iPad Air
+  { id: 'ipad_air_13_m2', name: 'iPad Air 13" (M2)', width: 1032, height: 1376, category: 'iPad' },
+  { id: 'ipad_air_11_m2', name: 'iPad Air 11" (M2)', width: 820, height: 1180, category: 'iPad' },
+  { id: 'ipad_air_5', name: 'iPad Air (5th gen)', width: 820, height: 1180, category: 'iPad' },
+  { id: 'ipad_air_4', name: 'iPad Air (4th gen)', width: 820, height: 1180, category: 'iPad' },
+  { id: 'ipad_air_3', name: 'iPad Air (3rd gen)', width: 834, height: 1112, category: 'iPad' },
+
+  // iPad
+  { id: 'ipad_10', name: 'iPad (10th gen)', width: 820, height: 1180, category: 'iPad' },
+  { id: 'ipad_9', name: 'iPad (9th gen)', width: 810, height: 1080, category: 'iPad' },
+  { id: 'ipad_8', name: 'iPad (8th gen)', width: 810, height: 1080, category: 'iPad' },
+  { id: 'ipad_7', name: 'iPad (7th gen)', width: 810, height: 1080, category: 'iPad' },
+  { id: 'ipad_6', name: 'iPad (6th gen)', width: 768, height: 1024, category: 'iPad' },
+  { id: 'ipad_5', name: 'iPad (5th gen)', width: 768, height: 1024, category: 'iPad' },
+
+  // iPad mini
+  { id: 'ipad_mini_6', name: 'iPad mini (6th gen)', width: 744, height: 1133, category: 'iPad' },
+  { id: 'ipad_mini_5', name: 'iPad mini (5th gen)', width: 768, height: 1024, category: 'iPad' },
 ];
-
-// Template for new command (generated by backend/generate_template.py)
-const TEMPLATE_PLIST_BASE64 = "PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPCFET0NUWVBFIHBsaXN0IFBVQkxJQyAiLS8vQXBwbGUvL0RURCBQTElTVCAxLjAvL0VOIiAiaHR0cDovL3d3dy5hcHBsZS5jb20vRFREcy9Qcm9wZXJ0eUxpc3QtMS4wLmR0ZCI+CjxwbGlzdCB2ZXJzaW9uPSIxLjAiPgo8ZGljdD4KCTxrZXk+Q29tbWFuZHNUYWJsZTwva2V5PgoJPGRpY3Q+CgkJPGtleT5DdXN0b20uMTc2NDkyNzUxNi5lYzVjODE8L2tleT4KCQk8ZGljdD4KCQkJPGtleT5Db21tYW5kSUQ8L2tleT4KCQkJPHN0cmluZz5DdXN0b20uMTc2NDkyNzUxNi5lYzVjODE8L3N0cmluZz4KCQkJPGtleT5DdXN0b21Db21tYW5kczwva2V5PgoJCQk8ZGljdD4KCQkJCTxrZXk+ZW5fVVM8L2tleT4KCQkJCTxhcnJheT4KCQkJCQk8c3RyaW5nPk5ldyBDb21tYW5kPC9zdHJpbmc+CgkJCQk8L2FycmF5PgoJCQkJPGtleT5qYV9KUDwva2V5PgoJCQkJPGFycmF5PgoJCQkJCTxzdHJpbmc+5paw6KaP44Kz44Oe44Oz44OJPC9zdHJpbmc+CgkJCQk8L2FycmF5PgoJCQk8L2RpY3Q+CgkJCTxrZXk+Q3VzdG9tR2VzdHVyZTwva2V5PgoJCQk8ZGF0YT4KCQkJWW5Cc2FYTjBNRERVQVFJREJBVUdGeHBaSkdGeVkyaHBkbVZ5V0NSdlltcGxZM1J6VkNSMAoJCQliM0JZSkhabGNuTnBiMjVmRUE5T1UwdGxlV1ZrUVhKamFHbDJaWEtsQndnUEVCRlZKRzUxCgkJCWJHelNDUW9MREZZa1kyeGhjM05hVGxNdWIySnFaV04wYzRBRW9nME9nQUtBQTFwN05UQXcKCQkJTENBME1EQjlXbnMyTURBc0lEUXdNSDNTRWhNVUZWZ2tZMnhoYzNObGMxb2tZMnhoYzNOdQoJCQlZVzFsb2hVV1YwNVRRWEp5WVhsWVRsTlBZbXBsWTNUUkdCbFVjbTl2ZElBQkVnQUJocUFJCgkJCUVSc2tLVEpFU2xCVlhHZHBiRzV3ZTRhTGxKK2lxck8ydTcwQUFBQUFBQUFCQVFBQUFBQUEKCQkJQUFBYkFBQUFBQUFBQUFBQUFBQUFBQUFBd2c9PQoJCQk8L2RhdGE+CgkJCTxrZXk+RW5hYmxlZDwva2V5PgoJCQk8dHJ1ZS8+CgkJPC9kaWN0PgoJPC9kaWN0PgoJPGtleT5FeHBvcnREYXRlPC9rZXk+Cgk8cmVhbD4xNzY0OTI3NTE2LjAyNzg1NTk8L3JlYWw+Cgk8a2V5PlZlcnNpb248L2tleT4KCTxyZWFsPjEuMDwvcmVhbD4KPC9kaWN0Pgo8L3BsaXN0Pgo=";
 
 const DEFAULT_COMMAND_POINTS: Point[] = [
   { x: 160, y: 400 }, // Start point
   { x: 160, y: 300 }  // End point (Swipe Up)
 ];
 
-const FILE_COLORS = [
+const COMMAND_COLORS = [
   '#3B82F6', // Blue
   '#F59E0B', // Yellow
   '#8B5CF6', // Purple
@@ -32,63 +112,132 @@ const FILE_COLORS = [
 ];
 
 function App() {
-  const [files, setFiles] = useState<VoiceControlFile[]>([]);
+  const [commands, setCommands] = useState<Command[]>([]);
+
   // Helper to get next color
-  const getNextColor = (currentFiles: VoiceControlFile[]) => {
-    const usedColors = new Set(currentFiles.map(f => f.color));
-    for (const color of FILE_COLORS) {
+  const getNextColor = (currentCommands: Command[]) => {
+    const usedColors = new Set(currentCommands.map(c => c.color));
+    for (const color of COMMAND_COLORS) {
       if (!usedColors.has(color)) return color;
     }
-    return FILE_COLORS[currentFiles.length % FILE_COLORS.length];
+    return COMMAND_COLORS[currentCommands.length % COMMAND_COLORS.length];
   };
 
-  const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string>(DEVICES[0].id);
+  const [selectedCommandId, setSelectedCommandId] = useState<string | null>(null);
+  const [selectedStrokeIndex, setSelectedStrokeIndex] = useState<number | null>(null);
+  
+  // Refactored Device State
+  const [selectedModelId, setSelectedModelId] = useState<string>('iphone_16_pro'); // Default to iPhone 16 Pro
+  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
+  const [scale, setScale] = useState<number>(0.6);
+
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState<boolean>(true);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
-  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
-  const [showSettingsPopup, setShowSettingsPopup] = useState<boolean>(false);
-  const [duration, setDuration] = useState<number>(1.0); // Default 1.0s
+  // const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
+  // Remove unused state
+  // const [showSettingsPopup, setShowSettingsPopup] = useState<boolean>(false);
+  const [duration, setDuration] = useState<number>(1.0); // Display value
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [simulationProgress, setSimulationProgress] = useState<number | null>(null);
+  const [markerPosition, setMarkerPosition] = useState<Point | null>(null);
+
 
   const appRef = useRef<HTMLDivElement>(null);
   const animationRef = useRef<number | null>(null);
   const startTimeRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-      if (!document.fullscreenElement) {
-        setShowSettingsPopup(false);
-      }
-    };
+  const selectedCommand = useMemo(() => {
+    return commands.find(c => c.id === selectedCommandId);
+  }, [commands, selectedCommandId]);
 
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, []);
+  // useEffect(() => {
+  //   const handleFullscreenChange = () => {
+  //     // setIsFullscreen(!!document.fullscreenElement);
+  //   };
+
+  //   document.addEventListener('fullscreenchange', handleFullscreenChange);
+  //   return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  // }, []);
 
   // Animation Loop
   useEffect(() => {
-    if (isPlaying) {
+    if (isPlaying && selectedCommand) {
+      // Build Timeline based on selection
+      const timeline: { type: 'stroke' | 'wait', duration: number, strokeIndex?: number }[] = [];
+
+      if (selectedStrokeIndex !== null && selectedStrokeIndex < selectedCommand.strokes.length) {
+        // Play ONLY the selected stroke
+        const s = selectedCommand.strokes[selectedStrokeIndex];
+        timeline.push({ type: 'stroke', duration: Math.max(0.1, s.length / 60), strokeIndex: selectedStrokeIndex });
+      } else {
+        // Play ALL strokes in sequence
+         const waitTime = selectedCommand.waitDuration !== undefined ? selectedCommand.waitDuration : 0.2;
+         selectedCommand.strokes.forEach((s, i) => {
+           if (i > 0) {
+              // Wait time BEFORE stroke i.
+              // Which is "Wait After" stroke i-1.
+              const prevStrokeWait = selectedCommand.strokeMetadata?.[i-1]?.waitAfter;
+              const actualWait = prevStrokeWait !== undefined ? prevStrokeWait : waitTime;
+              timeline.push({ type: 'wait', duration: actualWait });
+           }
+           timeline.push({ type: 'stroke', duration: Math.max(0.1, s.length / 60), strokeIndex: i });
+         });
+      }
+
+      const totalDuration = timeline.reduce((acc, item) => acc + item.duration, 0);
+
       const animate = (time: number) => {
         if (startTimeRef.current === null) {
           startTimeRef.current = time;
         }
 
         const elapsed = (time - startTimeRef.current) / 1000; // seconds
-        const progress = Math.min(elapsed / duration, 1.0);
 
-        setSimulationProgress(progress);
-
-        if (progress < 1.0) {
-          animationRef.current = requestAnimationFrame(animate);
-        } else {
+        if (elapsed >= totalDuration) {
           setIsPlaying(false);
-          setSimulationProgress(null);
+          setMarkerPosition(null);
           startTimeRef.current = null;
+          return;
         }
+
+        // Find current position
+        let runTime = 0;
+        let activeFound = false;
+
+        for (const item of timeline) {
+          if (elapsed >= runTime && elapsed < runTime + item.duration) {
+            if (item.type === 'stroke' && item.strokeIndex !== undefined) {
+              const stroke = selectedCommand.strokes[item.strokeIndex];
+              const localProgress = (elapsed - runTime) / item.duration; // 0 to 1
+              if (stroke.length > 0) {
+                // Interpolate
+                const exactIndex = localProgress * (stroke.length - 1);
+                const idx = Math.floor(exactIndex);
+                const nextIdx = Math.min(idx + 1, stroke.length - 1);
+                const t = exactIndex - idx;
+                const p1 = stroke[idx];
+                const p2 = stroke[nextIdx];
+                setMarkerPosition({
+                  x: p1.x + (p2.x - p1.x) * t,
+                  y: p1.y + (p2.y - p1.y) * t
+                });
+                activeFound = true;
+              }
+            } else {
+              // In wait period
+              setMarkerPosition(null);
+              activeFound = true;
+            }
+            break;
+          }
+          runTime += item.duration;
+        }
+
+        if (!activeFound) setMarkerPosition(null);
+
+        animationRef.current = requestAnimationFrame(animate);
       };
 
       animationRef.current = requestAnimationFrame(animate);
@@ -96,7 +245,7 @@ function App() {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
-      setSimulationProgress(null);
+      setMarkerPosition(null);
       startTimeRef.current = null;
     }
 
@@ -105,245 +254,26 @@ function App() {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isPlaying, duration]);
+  }, [isPlaying, selectedCommand, selectedStrokeIndex]);
 
-  const togglePlay = () => {
+  const togglePlay = useCallback(() => {
     setIsPlaying(!isPlaying);
-  };
-
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      const isFull = !!document.fullscreenElement;
-      console.log('Fullscreen change:', isFull);
-      setIsFullscreen(isFull);
-    };
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-    };
-  }, []);
+  }, [isPlaying]);
 
   const selectedDevice = useMemo(() => {
-    return DEVICES.find(d => d.id === selectedDeviceId) || DEVICES[0];
-  }, [selectedDeviceId]);
-
-  // ... (rest of the code)
-
-
-  const handleCreateNewFile = async () => {
-    try {
-      // Convert base64 template to Blob/File to reuse parseFile logic (or just mock it)
-      // Since parseFile takes a File object and sends it to backend, we can create a File from base64.
-
-      const byteCharacters = atob(TEMPLATE_PLIST_BASE64);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: 'application/x-plist' });
-      const file = new File([blob], "New File.voicecontrolcommands", { type: 'application/x-plist' });
-
-      const result = await parseFile(file);
-
-      const newCommands = result.commands.map(c => {
-        const newId = crypto.randomUUID();
-        // Generate points for default duration (0.4s)
-        const initialPoints = resamplePath(DEFAULT_COMMAND_POINTS, 0.4);
-        return {
-          ...c,
-          id: newId,
-          points: initialPoints,
-          isVisible: true,
-          duration: 0.4
-        };
-      });
-
-      const newFile: VoiceControlFile = {
-        id: crypto.randomUUID(),
-        name: "New File",
-        originalContent: TEMPLATE_PLIST_BASE64,
-        commands: newCommands,
-        offsetX: 0,
-        offsetY: 0,
-        selectedCommandId: newCommands.length > 0 ? newCommands[0].id : null,
-        isVisible: true,
-        color: getNextColor(files),
-      };
-
-      setFiles(prev => [...prev, newFile]);
-      setSelectedFileId(newFile.id);
-      setDuration(0.4); // Sync global duration
-
-    } catch (error) {
-      console.error('Error creating new file:', error);
-      alert('Failed to create new file.');
+    const model = DEVICE_MODELS.find(d => d.id === selectedModelId) || DEVICE_MODELS[0];
+    if (orientation === 'landscape') {
+      return { ...model, width: model.height, height: model.width };
     }
-  };
+    return model;
+  }, [selectedModelId, orientation]);
 
-  const handleBackgroundImageUpload = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      setBackgroundImage(result);
 
-      // Auto-detect device based on image aspect ratio/dimensions
-      const img = new Image();
-      img.onload = () => {
-        const width = img.width;
-        const height = img.height;
-        const aspectRatio = width / height;
-
-        // Find best matching device
-        // We check if the aspect ratio matches closely (within small tolerance)
-        // or if dimensions match exactly (scaled)
-        const matchedDevice = DEVICES.find(device => {
-          const deviceRatio = device.width / device.height;
-          return Math.abs(aspectRatio - deviceRatio) < 0.01;
-        });
-
-        if (matchedDevice) {
-          setSelectedDeviceId(matchedDevice.id);
-          console.log(`Auto-detected device: ${matchedDevice.name}`);
-        }
-      };
-      img.src = result;
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleClearBackgroundImage = () => {
-    setBackgroundImage(null);
-  };
-
-  const handleDeleteFile = (id: string) => {
-    setFiles(prev => prev.filter(f => f.id !== id));
-    if (selectedFileId === id) {
-      setSelectedFileId(null);
-    }
-  };
-
-  const handleDeleteCommand = (fileId: string, commandId: string) => {
-    setFiles(prev => prev.map(f => {
-      if (f.id !== fileId) return f;
-      const newCommands = f.commands.filter(c => c.id !== commandId);
-      return {
-        ...f,
-        commands: newCommands,
-        selectedCommandId: f.selectedCommandId === commandId ? (newCommands.length > 0 ? newCommands[0].id : null) : f.selectedCommandId
-      };
-    }));
-  };
-
-  const handleToggleVisibility = (id: string) => {
-    setFiles(prev => prev.map(f => f.id === id ? { ...f, isVisible: !f.isVisible } : f));
-  };
-
-  const handleToggleCommandVisibility = (fileId: string, commandId: string) => {
-    setFiles(prev => prev.map(f => {
-      if (f.id !== fileId) return f;
-      return {
-        ...f,
-        commands: f.commands.map(c => c.id === commandId ? { ...c, isVisible: !c.isVisible } : c)
-      };
-    }));
-  };
-
-  const handleToggleAllVisibility = () => {
-    setFiles(prev => {
-      const allVisible = prev.every(f => f.isVisible && f.commands.every(c => c.isVisible !== false));
-      const newState = !allVisible;
-      return prev.map(f => ({
-        ...f,
-        isVisible: newState,
-        commands: f.commands.map(c => ({ ...c, isVisible: newState }))
-      }));
-    });
-  };
-
-  const handleRenameFile = (fileId: string, newName: string) => {
-    setFiles(prev => prev.map(f => f.id === fileId ? { ...f, name: newName } : f));
-  };
-
-  const handleRenameCommand = (fileId: string, commandId: string, newName: string) => {
-    setFiles(prev => prev.map(f => {
-      if (f.id !== fileId) return f;
-      return {
-        ...f,
-        commands: f.commands.map(c => c.id === commandId ? { ...c, name: newName } : c)
-      };
-    }));
-  };
-
-  const selectedFile = useMemo(() => {
-    return files.find(f => f.id === selectedFileId);
-  }, [files, selectedFileId]);
-
-  const updateSelectedFile = (updates: Partial<VoiceControlFile>) => {
-    if (!selectedFileId) return;
-    setFiles(prev => prev.map(f => f.id === selectedFileId ? { ...f, ...updates } : f));
-  };
-
-  const selectedCommand = useMemo(() => {
-    if (!selectedFile || !selectedFile.selectedCommandId) return undefined;
-    return selectedFile.commands.find(c => c.id === selectedFile.selectedCommandId);
-  }, [selectedFile]);
-
-  // Update duration when selected file/command changes
-  useEffect(() => {
-    if (selectedCommand) {
-      // Estimate duration from points (assuming 60fps)
-      const estimatedDuration = selectedCommand.points.length / 60;
-      // Round to 1 decimal place
-      setDuration(Math.round(estimatedDuration * 10) / 10);
-    }
-  }, [selectedCommand]);
-
-  // Compute paths for all visible files
-  const canvasPaths = useMemo(() => {
-    return files
-      .filter(f => f.isVisible)
-      .flatMap(f =>
-        f.commands
-          .filter(c => c.isVisible !== false)
-          .map((cmd, index) => {
-            const isSelected = cmd.id === selectedFile?.selectedCommandId;
-            return {
-              id: cmd.id,
-              fileId: f.id,
-              commandId: cmd.id,
-              points: cmd.points.map(p => ({
-                x: p.x + f.offsetX,
-                y: p.y + f.offsetY
-              })),
-              color: f.color,
-              isSelected: isSelected,
-              label: (f.id === selectedFileId) ? String(index + 1) : undefined
-            };
-          })
-      );
-  }, [files, selectedFileId, selectedFile]);
-  // Points for export (only for the selected file)
-  const exportPoints = useMemo<Point[]>(() => {
-    if (!selectedCommand || !selectedFile) return [];
-    return selectedCommand.points.map(p => ({
-      x: p.x + selectedFile.offsetX,
-      y: p.y + selectedFile.offsetY,
-    }));
-  }, [selectedCommand, selectedFile]);
-
+  // Helper for path resampling
   const resamplePath = (points: Point[], dur: number): Point[] => {
     if (points.length === 0) return [];
-
-    const targetCount = Math.max(2, Math.round(dur * 60)); // 60Hz
-
-    // If it's a single point (Tap), just repeat it
-    if (points.length === 1) {
-      return Array(targetCount).fill(points[0]);
-    }
-
-    // If it's a straight line (2 points), use linear interpolation
+    const targetCount = Math.max(2, Math.round(dur * 60));
+    if (points.length === 1) return Array(targetCount).fill(points[0]);
     if (points.length === 2) {
       const start = points[0];
       const end = points[1];
@@ -357,9 +287,7 @@ function App() {
       }
       return newPoints;
     }
-
-    // For complex paths, we need to resample along the path length
-    // 1. Calculate total length and segment lengths
+    // Complex path resampling
     let totalLength = 0;
     const segmentLengths: number[] = [];
     for (let i = 0; i < points.length - 1; i++) {
@@ -369,296 +297,427 @@ function App() {
       segmentLengths.push(dist);
       totalLength += dist;
     }
-
-    if (totalLength === 0) {
-      return Array(targetCount).fill(points[0]);
-    }
-
-    const newPoints: Point[] = [points[0]]; // Start with first point
+    if (totalLength === 0) return Array(targetCount).fill(points[0]);
+    const newPoints: Point[] = [points[0]];
     const step = totalLength / (targetCount - 1);
-
     let currentDist = 0;
     let currentSegmentIndex = 0;
-
     for (let i = 1; i < targetCount - 1; i++) {
       const targetDist = i * step;
-
-      // Find the segment that contains targetDist
       while (currentSegmentIndex < segmentLengths.length && currentDist + segmentLengths[currentSegmentIndex] < targetDist) {
         currentDist += segmentLengths[currentSegmentIndex];
         currentSegmentIndex++;
       }
-
       if (currentSegmentIndex >= segmentLengths.length) {
         newPoints.push(points[points.length - 1]);
         continue;
       }
-
       const segmentStart = points[currentSegmentIndex];
       const segmentEnd = points[currentSegmentIndex + 1];
       const segmentLen = segmentLengths[currentSegmentIndex];
-
       const distInSegment = targetDist - currentDist;
       const t = distInSegment / segmentLen;
-
       newPoints.push({
         x: segmentStart.x + (segmentEnd.x - segmentStart.x) * t,
         y: segmentStart.y + (segmentEnd.y - segmentStart.y) * t
       });
     }
-
-    newPoints.push(points[points.length - 1]); // End with last point
+    newPoints.push(points[points.length - 1]);
     return newPoints;
   };
 
+  // Command Management
+  const handleCreateNewCommand = () => {
+    const newId = crypto.randomUUID();
+    const initialPoints = resamplePath(DEFAULT_COMMAND_POINTS, 0.4);
 
+    // Create new command with one stroke
+    const newCommand: Command = {
+      id: newId,
+      name: "New Command",
+      points: initialPoints, // Legacy support, keeps sync with first stroke
+      strokes: [initialPoints],
+      isVisible: true,
+      duration: 0.4,
+      waitDuration: 0.2, // Default wait duration
+      color: getNextColor(commands) // Assign color to command
+    };
 
-  // Calculate Angle and Length
-  const { angle, length } = useMemo(() => {
-    if (!selectedCommand || selectedCommand.points.length < 2) return { angle: 0, length: 0 };
-
-    const start = selectedCommand.points[0];
-    const end = selectedCommand.points[selectedCommand.points.length - 1];
-
-    const dx = end.x - start.x;
-    const dy = end.y - start.y; // Y increases downwards in canvas usually, but let's check coordinate system.
-    // In standard math, y increases upwards. In canvas, y increases downwards.
-    // angle = atan2(dy, dx).
-    // We want 0-1023 mapping.
-    // 0 = Right (0 rad), 256 = Down (PI/2), 512 = Left (PI), 768 = Up (-PI/2 or 3PI/2)
-
-    let rad = Math.atan2(dy, dx);
-    if (rad < 0) rad += 2 * Math.PI;
-
-    const angleVal = (rad / (2 * Math.PI)) * 1024;
-    const lengthVal = Math.sqrt(dx * dx + dy * dy);
-
-    return { angle: angleVal, length: lengthVal };
-  }, [selectedCommand]);
-
-  const handleAngleChange = (newAngle: number) => {
-    if (!selectedFileId || !selectedCommand || selectedCommand.points.length < 2) return;
-
-    const start = selectedCommand.points[0];
-    const end = selectedCommand.points[selectedCommand.points.length - 1];
-
-    const midX = (start.x + end.x) / 2;
-    const midY = (start.y + end.y) / 2;
-
-    const rad = (newAngle / 1024) * 2 * Math.PI;
-    const halfLen = length / 2;
-
-    const dx = Math.cos(rad) * halfLen;
-    const dy = Math.sin(rad) * halfLen;
-
-    const newStart = { x: midX - dx, y: midY - dy };
-    const newEnd = { x: midX + dx, y: midY + dy };
-    // Update points (straight line)
-    // We need to keep the duration (point count) consistent or update it?
-    // If we drag start/end, we probably want to keep the duration (speed) roughly same?
-    // Or keep point count same?
-    // generateStraightLinePoints used duration to calculate count.
-    // Let's use resamplePath with current duration.
-    // But we need to know duration.
-    // If cmd.duration is set, use it. Else default 1.0.
-    const command = selectedCommand; // Assuming selectedCommand is the command being modified
-    const duration = command.duration || 1.0;
-    const newPoints = resamplePath([newStart, newEnd], duration);
-
-    updateSelectedFile({
-      commands: selectedFile!.commands.map(c =>
-        c.id === command.id ? { ...c, points: newPoints } : c
-      )
-    });
-  };
-
-  const handleLengthChange = (newLength: number) => {
-    if (!selectedFileId || !selectedCommand || selectedCommand.points.length < 2) return;
-
-    const start = selectedCommand.points[0];
-    const end = selectedCommand.points[selectedCommand.points.length - 1];
-
-    const midX = (start.x + end.x) / 2;
-    const midY = (start.y + end.y) / 2;
-
-    // Keep current angle
-    const dx = end.x - start.x;
-    const dy = end.y - start.y;
-    const rad = Math.atan2(dy, dx);
-
-    const halfLen = newLength / 2;
-    const newDx = Math.cos(rad) * halfLen;
-    const newDy = Math.sin(rad) * halfLen;
-
-    const newStart = { x: midX - newDx, y: midY - newDy };
-    const newEnd = { x: midX + newDx, y: midY + newDy };
-
-    const command = selectedCommand;
-    const duration = command.duration || 1.0;
-    const newPoints = resamplePath([newStart, newEnd], duration);
-
-    updateSelectedFile({
-      commands: selectedFile!.commands.map(c =>
-        c.id === selectedCommand.id ? { ...c, points: newPoints } : c
-      )
-    });
-  };
-
-
-  const handlePathDrag = (id: string, deltaX: number, deltaY: number, type: 'move' | 'start' | 'end') => {
-    if (isPlaying) return;
-
-    setFiles(prev => prev.map(f => {
-      // Find if this file contains the command
-      const cmdIndex = f.commands.findIndex(c => c.id === id);
-      if (cmdIndex === -1) return f;
-
-      const cmd = f.commands[cmdIndex];
-      let newPoints = [...cmd.points];
-
-      if (type === 'move') {
-        newPoints = newPoints.map(p => ({ x: p.x + deltaX, y: p.y + deltaY }));
-      } else if (type === 'start') {
-        const newStart = { x: newPoints[0].x + deltaX, y: newPoints[0].y + deltaY };
-        const end = newPoints[newPoints.length - 1];
-        // Regenerate points to keep it a straight line
-        newPoints = resamplePath([newStart, end], duration);
-      } else if (type === 'end') {
-        const start = newPoints[0];
-        const newEnd = { x: newPoints[newPoints.length - 1].x + deltaX, y: newPoints[newPoints.length - 1].y + deltaY };
-        // Regenerate points to keep it a straight line
-        newPoints = resamplePath([start, newEnd], duration);
-      }
-
-      const newCommands = [...f.commands];
-      newCommands[cmdIndex] = { ...cmd, points: newPoints };
-
-      return { ...f, commands: newCommands };
-    }));
+    setCommands(prev => [...prev, newCommand]);
+    setSelectedCommandId(newId);
+    setSelectedStrokeIndex(0); // Select the first stroke by default for immediate editing
+    setDuration(0.4);
   };
 
   const handleFileUpload = async (file: File) => {
     try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const content = e.target?.result as string;
-        const base64Content = content.split(',')[1];
+      const result = await parseFile(file);
 
-        const result = await parseFile(file);
+      const newCommands = result.commands.map(c => {
+        // Ensure strokes are populated
+        const strokes = (c.strokes && c.strokes.length > 0) ? c.strokes : [c.points];
 
-        // Strip extension for display name
-        const nameWithoutExt = file.name.replace(/\.(voicecontrolcommands|plist)$/i, '');
-
-        const newFile: VoiceControlFile = {
-          id: crypto.randomUUID(),
-          name: nameWithoutExt,
-          originalContent: base64Content,
-          commands: result.commands.map(c => {
-            const newId = crypto.randomUUID();
-            return {
-              ...c,
-              id: newId, // Regenerate ID to ensure uniqueness across files
-              points: c.points.map(p => ({ ...p })), // Deep copy points
-              isVisible: true
-            };
-          }),
-          offsetX: 0,
-          offsetY: 0,
-          selectedCommandId: null, // Will be set after commands are processed
+        const newId = crypto.randomUUID();
+        return {
+          ...c,
+          id: newId,
           isVisible: true,
-          color: getNextColor(files),
+          color: getNextColor(commands), // Assign color to command
+          strokes: strokes,
+          points: strokes[0] // Main preview points
         };
+      });
 
-        // Set selected command to the first one (with the new ID)
-        if (newFile.commands.length > 0) {
-          newFile.selectedCommandId = newFile.commands[0].id;
-        }
+      setCommands(prev => [...prev, ...newCommands]);
+      if (newCommands.length > 0) {
+        setSelectedCommandId(newCommands[0].id);
+        setSelectedStrokeIndex(null); // Default to whole command selection
+      }
 
-        setFiles(prev => [...prev, newFile]);
-        setSelectedFileId(newFile.id);
-      };
-      reader.readAsDataURL(file);
     } catch (error) {
       console.error('Error parsing file:', error);
       alert(`Failed to parse file: ${file.name}`);
     }
   };
 
-  const handleExport = async () => {
-    if (!selectedFile || !selectedFile.selectedCommandId || !selectedCommand) return;
+  // selectedCommand moved up to fix scoping
+  // const selectedCommand = ...
 
-    // Ensure filename has .plist extension
-    // Use command name for single command export
-    let filename = selectedCommand.name;
-    if (!filename.toLowerCase().endsWith('.plist')) {
-      filename += '.plist';
+  // Helper functions for geometric transformations
+  const getSelectedStrokePoints = (): Point[] | null => {
+    if (!selectedCommand) return null;
+    if (selectedStrokeIndex !== null) {
+      if (selectedStrokeIndex < selectedCommand.strokes.length) {
+        return selectedCommand.strokes[selectedStrokeIndex];
+      }
+    } else if (selectedCommand.strokes.length > 0) {
+      return selectedCommand.strokes[0];
     }
+    return null;
+  };
 
-    const commandsToExport = [{
+  const calculateAngle = (points: Point[]): number => {
+    if (points.length < 2) return 0;
+    const start = points[0];
+    const end = points[points.length - 1];
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    let angleRad = Math.atan2(dy, dx);
+    if (angleRad < 0) angleRad += 2 * Math.PI;
+    return Math.round((angleRad / (2 * Math.PI)) * 1024) % 1024;
+  };
+
+  const calculateLength = (points: Point[]): number => {
+    if (points.length < 2) return 0;
+    const start = points[0];
+    const end = points[points.length - 1];
+    return Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2));
+  };
+
+  const updateSelectedStroke = (newPoints: Point[]) => {
+    if (!selectedCommandId) return;
+    setCommands(prev => prev.map(cmd => {
+      if (cmd.id !== selectedCommandId) return cmd;
+      let newStrokes = [...cmd.strokes];
+      if (selectedStrokeIndex !== null) {
+        if (selectedStrokeIndex < newStrokes.length) {
+          newStrokes[selectedStrokeIndex] = newPoints;
+        }
+      } else {
+        if (newStrokes.length > 0) newStrokes[0] = newPoints;
+      }
+      const legacyPoints = (newStrokes.length > 0) ? newStrokes[0] : [];
+      return { ...cmd, strokes: newStrokes, points: legacyPoints };
+    }));
+  };
+
+  const handleAngleChange = (newAngleRaw: number) => {
+    const points = getSelectedStrokePoints();
+    if (!points || points.length < 2) return;
+
+    const currentAngleRaw = calculateAngle(points);
+    const diffRaw = newAngleRaw - currentAngleRaw;
+    const diffRad = (diffRaw / 1024) * 2 * Math.PI;
+
+    const start = points[0];
+    const end = points[points.length - 1];
+    const mid = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+
+    const cos = Math.cos(diffRad);
+    const sin = Math.sin(diffRad);
+
+    const newPoints = points.map(p => {
+      const dx = p.x - mid.x;
+      const dy = p.y - mid.y;
+      return {
+        x: mid.x + (dx * cos - dy * sin),
+        y: mid.y + (dx * sin + dy * cos)
+      };
+    });
+
+    updateSelectedStroke(newPoints);
+  };
+
+  const handleLengthChange = (newLength: number) => {
+    const points = getSelectedStrokePoints();
+    if (!points || points.length < 2) return;
+
+    const currentLen = calculateLength(points);
+    if (currentLen === 0) return;
+
+    const scale = newLength / currentLen;
+    const start = points[0];
+    const end = points[points.length - 1];
+    const mid = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+
+    const newPoints = points.map(p => ({
+      x: mid.x + (p.x - mid.x) * scale,
+      y: mid.y + (p.y - mid.y) * scale
+    }));
+
+    updateSelectedStroke(newPoints);
+  };
+
+  const handleNudge = useCallback((type: 'x' | 'y', delta: number) => {
+    if (!selectedCommandId) return;
+    setCommands(prev => prev.map(cmd => {
+      if (cmd.id !== selectedCommandId) return cmd;
+      let strokesToUpdate: number[] = [];
+      if (selectedStrokeIndex !== null) {
+        const idx = selectedStrokeIndex;
+        if (idx < cmd.strokes.length) strokesToUpdate.push(idx);
+      } else {
+        strokesToUpdate = cmd.strokes.map((_, i) => i);
+      }
+      const newStrokes = cmd.strokes.map((stroke, i) => {
+        if (strokesToUpdate.includes(i)) {
+          // Explicitly preserve length/duration by using resample or just map
+          // Mapping points 1:1 preserves count, which preserves duration.
+          // Just ensure we don't accidentally add/remove points.
+          return stroke.map(p => ({
+            x: type === 'x' ? p.x + delta : p.x,
+            y: type === 'y' ? p.y + delta : p.y
+          }));
+        }
+        return stroke;
+      });
+      const legacyPoints = (newStrokes.length > 0) ? newStrokes[0] : [];
+      return { ...cmd, strokes: newStrokes, points: legacyPoints };
+    }));
+  }, [selectedCommandId, selectedStrokeIndex]);
+
+
+  const handleCurve = () => {
+    if (!selectedCommandId) return;
+
+    setCommands(prev => prev.map(cmd => {
+      if (cmd.id !== selectedCommandId) return cmd;
+
+      // Determine usage: 
+      // If selectedStrokeIndex is set, curve only that one.
+      // If null, curve ALL strokes.
+      const indicesToCurve = selectedStrokeIndex !== null
+        ? [selectedStrokeIndex]
+        : cmd.strokes.map((_, i) => i);
+
+      const newStrokes = cmd.strokes.map((stroke, index) => {
+        if (!indicesToCurve.includes(index) || stroke.length < 2) return stroke;
+
+        const start = stroke[0];
+        const end = stroke[stroke.length - 1];
+        const pointCount = stroke.length;
+
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < 1) return stroke;
+
+        // Randomize offset direction and magnitude (approx 30% of length)
+        const offset = dist * 0.3;
+        const angle = Math.atan2(dy, dx);
+        const perpAngle = angle + (Math.random() > 0.5 ? Math.PI / 2 : -Math.PI / 2);
+
+        const midX = (start.x + end.x) / 2;
+        const midY = (start.y + end.y) / 2;
+
+        const controlX = midX + Math.cos(perpAngle) * offset;
+        const controlY = midY + Math.sin(perpAngle) * offset;
+
+        const newPoints: Point[] = [];
+        for (let i = 0; i < pointCount; i++) {
+          const t = i / (pointCount - 1);
+          const x = (1 - t) * (1 - t) * start.x + 2 * (1 - t) * t * controlX + t * t * end.x;
+          const y = (1 - t) * (1 - t) * start.y + 2 * (1 - t) * t * controlY + t * t * end.y;
+          newPoints.push({ x, y });
+        }
+        return newPoints;
+      });
+
+      const legacyPoints = (newStrokes.length > 0) ? newStrokes[0] : [];
+      return { ...cmd, strokes: newStrokes, points: legacyPoints };
+    }));
+  };
+
+  const currentAngle = useMemo(() => {
+    const points = getSelectedStrokePoints();
+    return points ? calculateAngle(points) : 0;
+  }, [selectedCommand, selectedStrokeIndex]);
+
+  const currentLength = useMemo(() => {
+    const points = getSelectedStrokePoints();
+    return points ? calculateLength(points) : 0;
+  }, [selectedCommand, selectedStrokeIndex]);
+
+  const currentHeadX = useMemo(() => {
+    const points = getSelectedStrokePoints();
+    if (points && points.length > 0) {
+      const start = points[0];
+      const end = points[points.length - 1];
+      return (start.x + end.x) / 2;
+    }
+    return 0;
+  }, [selectedCommand, selectedStrokeIndex]);
+
+  const currentHeadY = useMemo(() => {
+    const points = getSelectedStrokePoints();
+    if (points && points.length > 0) {
+      const start = points[0];
+      const end = points[points.length - 1];
+      return (start.y + end.y) / 2;
+    }
+    return 0;
+  }, [selectedCommand, selectedStrokeIndex]);
+
+
+  // Duration Sync:
+  // If stroke selected -> Show stroke duration
+  // If command selected -> Show total sequential duration (Read only preferably, or editable as global scale?) 
+  // User said "No need to set for command". So treating as Read Only or just informational.
+  useEffect(() => {
+    if (selectedCommand) {
+      if (selectedStrokeIndex !== null && selectedStrokeIndex < selectedCommand.strokes.length) {
+        // Specific stroke
+        const s = selectedCommand.strokes[selectedStrokeIndex];
+        // Allow shorter durations like 0.2s. Min 0.1s for safety.
+        setDuration(Math.max(0.1, Math.round((s.length / 60) * 10) / 10));
+      } else {
+        // Total sequential time: Sum(strokes) + Sum(gaps)
+        const waitTime = selectedCommand.waitDuration !== undefined ? selectedCommand.waitDuration : 0.2;
+        let total = 0;
+        selectedCommand.strokes.forEach((s, i) => {
+          if (i > 0) total += waitTime;
+          total += Math.max(0.1, s.length / 60);
+        });
+        setDuration(Math.round(total * 10) / 10);
+      }
+    }
+  }, [selectedCommand, selectedStrokeIndex]); // Add selectedStrokeIndex dependency
+
+
+  // Prepare canvas paths: Flatten all strokes of all visible commands
+  const canvasPaths = useMemo(() => {
+    return commands
+      .filter(c => c.isVisible)
+      .flatMap(cmd => {
+        const isCommandSelected = cmd.id === selectedCommandId;
+
+        // Map each stroke
+        return cmd.strokes.map((stroke, index) => {
+          // Highlight logic:
+          // 1. If Command is NOT selected -> False
+          // 2. If Command IS selected:
+          //    a. If selectedStrokeIndex is NULL -> Highlights ALL strokes (True)
+          //    b. If selectedStrokeIndex matches index -> True
+          //    c. Otherwise -> False
+
+          const isSelected = isCommandSelected && (selectedStrokeIndex === null || selectedStrokeIndex === index);
+
+          return {
+            id: `${cmd.id}_stroke_${index}`,
+            fileId: 'N/A',
+            commandId: cmd.id,
+            points: stroke,
+            color: cmd.color || '#000',
+            isSelected: isSelected,
+            label: isSelected ? String(index + 1) : undefined
+          };
+        });
+      });
+  }, [commands, selectedCommandId, selectedStrokeIndex]);
+
+  const canvasConnections = useMemo(() => {
+    if (!selectedCommand || selectedCommand.strokes.length < 2) return [];
+    
+    const connections: { from: Point, to: Point, duration: number, strokeIndex: number }[] = [];
+    const waitTime = selectedCommand.waitDuration !== undefined ? selectedCommand.waitDuration : 0.2;
+
+    for (let i = 0; i < selectedCommand.strokes.length - 1; i++) {
+        const strokeA = selectedCommand.strokes[i];
+        const strokeB = selectedCommand.strokes[i+1];
+        if (strokeA.length === 0 || strokeB.length === 0) continue;
+
+        const endA = strokeA[strokeA.length - 1];
+        const startB = strokeB[0];
+        
+        // Duration logic
+        const prevStrokeWait = selectedCommand.strokeMetadata?.[i]?.waitAfter;
+        const actualWait = prevStrokeWait !== undefined ? prevStrokeWait : waitTime;
+
+        connections.push({
+            from: endA,
+            to: startB,
+            duration: actualWait,
+            strokeIndex: i
+        });
+    }
+    return connections;
+  }, [selectedCommand]);
+
+  const handleExport = async () => {
+    if (!selectedCommand) return;
+
+    // Use the backend export_merged API to handle multi-stroke export correctly for single command
+    const commandToExport = {
       name: selectedCommand.name,
-      points: exportPoints
-    }];
+      points: [], // Not used if strokes is present
+      strokes: selectedCommand.strokes
+    };
 
-    // @ts-ignore
-    if (typeof window.showSaveFilePicker === 'function') {
-      try {
-        // 1. Get File Handle IMMEDIATELY (User Activation)
+    try {
+      const response = await fetch(`${API_BASE_URL}/export_merged`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commands: [commandToExport] }),
+      });
+
+      if (!response.ok) throw new Error('Export failed');
+      const result = await response.json();
+
+      let filename = selectedCommand.name;
+      if (!filename.toLowerCase().endsWith('.plist')) {
+        // User permitted usage of .plist extension to avoid the 16-char limit of showSaveFilePicker
+        filename += '.plist'; 
+      }
+
+      // Save file logic
+      // @ts-ignore
+      if (typeof window.showSaveFilePicker === 'function') {
         // @ts-ignore
         const handle = await window.showSaveFilePicker({
           suggestedName: filename,
           types: [{
-            description: 'Voice Control Commands',
+            description: 'Apple Property List',
             accept: { 'application/x-plist': ['.plist'] },
           }],
         });
-
-        // 2. Perform API Call
-        const response = await fetch(`${API_BASE_URL}/export_merged`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ commands: commandsToExport }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Export failed');
-        }
-
-        const result = await response.json();
-
-        // 3. Write to File
         const writable = await handle.createWritable();
         const binaryContent = Uint8Array.from(atob(result.content), c => c.charCodeAt(0));
         await writable.write(binaryContent);
         await writable.close();
-
-        alert('ファイルが正常に保存されました！');
-      } catch (err: any) {
-        if (err.name === 'AbortError') {
-          return; // User cancelled
-        }
-        console.error('File Save Error:', err);
-        alert(`ファイルシステムアクセスAPIエラー: ${err.message}`);
-      }
-    } else {
-      // Fallback for browsers not supporting File System Access API
-      try {
-        const response = await fetch(`${API_BASE_URL}/export_merged`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ commands: commandsToExport }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Export failed');
-        }
-
-        const result = await response.json();
-
-        const blob = new Blob([Uint8Array.from(atob(result.content), c => c.charCodeAt(0))], { type: 'application/x-plist' });
+      } else {
+        // Fallback for browsers that don't support showSaveFilePicker
+        const blob = new Blob([Uint8Array.from(atob(result.content), c => c.charCodeAt(0))], { type: 'application/octet-stream' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -667,479 +726,314 @@ function App() {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-      } catch (err: any) {
-        console.error('Export Error:', err);
-        alert(`エクスポートエラー: ${err.message}`);
       }
-    }
-  };
-
-  const handleEnterFullscreen = () => {
-    if (appRef.current) {
-      appRef.current.requestFullscreen().catch((err: any) => {
-        console.error(`Error attempting to enable full - screen mode: ${err.message}(${err.name})`);
-      });
-    }
-  };
-
-  const handleExitFullscreen = () => {
-    if (document.fullscreenElement) {
-      document.exitFullscreen().catch((err: any) => {
-        console.error(`Error attempting to exit full - screen mode: ${err.message}(${err.name})`);
-      });
-    }
-  };
-
-  const handleExportVisible = async () => {
-    const visibleFiles = files.filter(f => f.isVisible);
-    if (visibleFiles.length === 0) {
-      alert('表示されているファイルがありません。');
-      return;
-    }
-
-    const commandsToExport = visibleFiles.map(f => {
-      return f.commands.filter(c => c.isVisible !== false).map(cmd => ({
-        name: cmd.name,
-        points: cmd.points.map(p => ({
-          x: p.x + f.offsetX,
-          y: p.y + f.offsetY
-        }))
-      }));
-    }).flat();
-
-    try {
-      const response = await fetch('http://localhost:8000/api/export_merged', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ commands: commandsToExport }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Export failed');
-      }
-
-      const result = await response.json();
-
-      // Save logic (reuse from handleExport)
-      // @ts-ignore
-      if (typeof window.showSaveFilePicker === 'function') {
-        // @ts-ignore
-        const handle = await window.showSaveFilePicker({
-          suggestedName: 'merged.voicecontrolcommands',
-          types: [{
-            description: 'Voice Control Commands',
-            accept: { 'application/x-plist': ['.plist'] },
-          }],
-        });
-        const writable = await handle.createWritable();
-        const binaryContent = Uint8Array.from(atob(result.content), c => c.charCodeAt(0));
-        await writable.write(binaryContent);
-        await writable.close();
-        alert('ファイルが正常に保存されました！');
-      } else {
-        alert('このブラウザはファイルシステムアクセスAPIをサポートしていません。');
-      }
-
     } catch (error: any) {
       console.error('Export Error:', error);
-      alert(`エクスポートエラー: ${error.message}`);
+      alert(`Export Failed: ${error.message}`);
     }
   };
 
-  const handleAddCommandToFile = (fileId: string) => {
-    setFiles(prev => prev.map(f => {
-      if (f.id !== fileId) return f;
+  // Handle pinch-to-zoom
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
 
-      // Generate points for default duration (0.4s)
-      const initialPoints = resamplePath(DEFAULT_COMMAND_POINTS, 0.4);
-
-      const newCommand: Command = {
-        id: crypto.randomUUID(),
-        name: `New Command ${f.commands.length + 1}`,
-        points: initialPoints,
-        isVisible: true,
-        duration: 0.4
-      };
-      return {
-        ...f,
-        commands: [...f.commands, newCommand],
-        selectedCommandId: newCommand.id // Auto-select new command
-      };
-    }));
-    setSelectedFileId(fileId); // Ensure file is selected
-    setDuration(0.4); // Sync global duration
-  };
-
-  const handleAddTapCommand = (fileId: string) => {
-    setFiles(prev => prev.map(f => {
-      if (f.id !== fileId) return f;
-      const defaultDuration = 0.1;
-      const defaultPoint = { x: 160, y: 300 };
-      // Generate points for 0.1s (6 points at 60Hz)
-      const initialPoints = resamplePath([defaultPoint], defaultDuration);
-
-      const newCommand: Command = {
-        id: crypto.randomUUID(),
-        name: "New Tap",
-        points: initialPoints,
-        isVisible: true,
-        duration: defaultDuration
-      };
-
-      return {
-        ...f,
-        commands: [...f.commands, newCommand],
-        selectedCommandId: newCommand.id // Auto-select new command
-      };
-    }));
-    setSelectedFileId(fileId); // Ensure file is selected
-  };
-
-  const handleExportFile = async (fileId: string) => {
-    const file = files.find(f => f.id === fileId);
-    if (!file) return;
-
-    // Use export_merged logic to ensure all commands (including new ones) are included
-    // @ts-ignore
-    if (typeof window.showSaveFilePicker === 'function') {
-      try {
-        // @ts-ignore
-        const handle = await window.showSaveFilePicker({
-          suggestedName: file.name.endsWith('.plist') ? file.name : `${file.name}.plist`,
-          types: [{
-            description: 'Voice Control Commands',
-            accept: { 'application/x-plist': ['.plist'] },
-          }],
+    const handleWheel = (e: WheelEvent) => {
+      // Check for pinch gesture (ctrlKey + wheel)
+      // Note: On Mac trackpad, pinch sends wheel events with ctrlKey=true
+      if (e.ctrlKey) {
+        e.preventDefault();
+        
+        // Adjust scale sensitivity
+        const delta = -e.deltaY * 0.01; 
+        
+        setScale(prevScale => {
+          const newScale = Math.min(Math.max(prevScale + delta, 0.2), 3.0);
+          return newScale;
         });
-
-        const commandsToExport = file.commands.map(c => ({
-          name: c.name,
-          points: c.points.map(p => ({
-            x: p.x + file.offsetX,
-            y: p.y + file.offsetY
-          })),
-          duration: c.duration
-        }));
-
-        const response = await fetch(`${API_BASE_URL}/export_merged`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ commands: commandsToExport }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Export failed');
-        }
-
-        const result = await response.json();
-        const writable = await handle.createWritable();
-        const binaryContent = Uint8Array.from(atob(result.content), c => c.charCodeAt(0));
-        await writable.write(binaryContent);
-        await writable.close();
-
-        alert('ファイルが正常に保存されました！');
-      } catch (err: any) {
-        if (err.name === 'AbortError') return;
-        console.error('Export Error:', err);
-        alert(`エクスポートエラー: ${err.message}`);
       }
-    }
-  };
+    };
 
-  const handleCurve = () => {
-    if (!selectedCommand || !selectedFile) return;
+    // Need non-passive listener to prevent default browser zoom
+    container.addEventListener('wheel', handleWheel, { passive: false });
 
-    const start = selectedCommand.points[0];
-    const end = selectedCommand.points[selectedCommand.points.length - 1];
+    return () => {
+      container.removeEventListener('wheel', handleWheel);
+    };
+  }, []); // Empty deps as we use setScale callback form
 
-    // Calculate midpoint
-    const midX = (start.x + end.x) / 2;
-    const midY = (start.y + end.y) / 2;
+  const handlePathDrag = (id: string, deltaX: number, deltaY: number, type: 'move' | 'start' | 'end') => {
+    if (isPlaying) return;
 
-    // Calculate perpendicular vector
-    const dx = end.x - start.x;
-    const dy = end.y - start.y;
-    // Normalize and rotate 90 degrees
-    const length = Math.sqrt(dx * dx + dy * dy);
-    const perpX = -dy / length;
-    const perpY = dx / length;
+    // Use refined regex parsing to handle IDs like "uuid_stroke_0" safely vs "uuid_stroke_10"
+    const match = id.match(/^(.*)_stroke_(\d+)$/);
+    if (!match) return;
+    const commandId = match[1];
+    const targetStrokeIndex = parseInt(match[2], 10);
 
-    // Random offset magnitude (e.g., 20% to 50% of length)
-    // Random direction (positive or negative)
-    const offsetMagnitude = length * (0.2 + Math.random() * 0.3);
-    const direction = Math.random() < 0.5 ? 1 : -1;
+    setCommands((prev: Command[]) => prev.map((cmd: Command) => {
+      if (cmd.id !== commandId) return cmd;
 
-    // Control point
-    const controlX = midX + perpX * offsetMagnitude * direction;
-    const controlY = midY + perpY * offsetMagnitude * direction;
+      // If Command is selected (selectedStrokeIndex === null) and type is 'move', move ALL strokes
+      const isCommandMove = selectedStrokeIndex === null && type === 'move';
 
-    // Generate Bezier points
-    // P(t) = (1-t)^2 P0 + 2(1-t)t P1 + t^2 P2
-    const numPoints = Math.max(10, Math.floor(duration * 60)); // 60fps
-    const newPoints: Point[] = [];
+      const newStrokes = cmd.strokes.map((stroke, index) => {
+        // Condition to update this specific stroke:
+        // 1. It's a "Command Move" (move all)
+        // 2. OR it's the specific target stroke (single edit)
+        const shouldUpdate = isCommandMove || index === targetStrokeIndex;
 
-    for (let i = 0; i < numPoints; i++) {
-      const t = i / (numPoints - 1);
-      const x = Math.pow(1 - t, 2) * start.x + 2 * (1 - t) * t * controlX + Math.pow(t, 2) * end.x;
-      const y = Math.pow(1 - t, 2) * start.y + 2 * (1 - t) * t * controlY + Math.pow(t, 2) * end.y;
-      newPoints.push({ x, y });
-    }
+        if (!shouldUpdate) return stroke;
 
-    setFiles(prev => prev.map(f => {
-      if (f.id !== selectedFile.id) return f;
-      return {
-        ...f,
-        commands: f.commands.map(c =>
-          c.id === selectedCommand.id ? { ...c, points: newPoints } : c
-        )
-      };
+        // Apply modification
+        let newPoints = [...stroke];
+
+        if (type === 'move') {
+          newPoints = newPoints.map(p => ({ x: p.x + deltaX, y: p.y + deltaY }));
+        } else if (index === targetStrokeIndex) {
+          // Start/End drags only apply to the specific target stroke even in command mode
+          // (Can't meaningfully drag 5 start points at once with one mouse cursor)
+          if (type === 'start') {
+            const newStart = { x: newPoints[0].x + deltaX, y: newPoints[0].y + deltaY };
+            const end = newPoints[newPoints.length - 1];
+
+            if (newPoints.length) {
+              const currentPointsCount = stroke.length;
+              const currentDuration = Math.max(0.4, currentPointsCount / 60);
+              newPoints = resamplePath([newStart, end], currentDuration);
+            }
+          } else if (type === 'end') {
+            const start = newPoints[0];
+            const newEnd = { x: newPoints[newPoints.length - 1].x + deltaX, y: newPoints[newPoints.length - 1].y + deltaY };
+            if (newPoints.length) {
+              const currentPointsCount = stroke.length;
+              const currentDuration = Math.max(0.4, currentPointsCount / 60);
+              newPoints = resamplePath([start, newEnd], currentDuration);
+            }
+          }
+        }
+        return newPoints;
+      });
+
+      // Update legacy points for preview if first stroke changed
+      const newLegacyPoints = (newStrokes.length > 0) ? newStrokes[0] : cmd.points;
+
+      return { ...cmd, strokes: newStrokes, points: newLegacyPoints };
     }));
   };
 
-  const handleSelectCommand = (fileId: string, commandId: string) => {
-    setSelectedFileId(fileId);
-    setFiles(prev => prev.map(f => {
-      if (f.id === fileId) {
-        const cmd = f.commands.find(c => c.id === commandId);
-        if (cmd && cmd.duration !== undefined) {
-          setDuration(cmd.duration);
-        } else {
-          // Default duration if not set (e.g. for paths, maybe keep 1.0 or calculate?)
-          // Also update global duration state to match new command
-          setDuration(0.4);
-        }
-        return { ...f, selectedCommandId: commandId };
-      }
-      return f;
-    }));
+
+  const handleBackgroundImageUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setBackgroundImage(e.target?.result as string);
+      // Device detection logic (simplified for brevity)
+    };
+    reader.readAsDataURL(file);
   };
+
+  const handleClearBackgroundImage = () => setBackgroundImage(null);
+  const handleEnterFullscreen = () => appRef.current?.requestFullscreen();
+  // const handleExitFullscreen = () => document.exitFullscreen();
+
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in an input
+      if (e.target instanceof HTMLElement && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+        return;
+      }
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        togglePlay();
+      } else if (e.code === 'ArrowUp') {
+        e.preventDefault();
+        handleNudge('y', -1);
+      } else if (e.code === 'ArrowDown') {
+        e.preventDefault();
+        handleNudge('y', 1);
+      } else if (e.code === 'ArrowLeft') {
+        e.preventDefault();
+        handleNudge('x', -1);
+      } else if (e.code === 'ArrowRight') {
+        e.preventDefault();
+        handleNudge('x', 1);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [togglePlay, handleNudge]); // Dependencies ensure fresh closures
+
+  const handleWaitDurationChange = (newDuration: number) => {
+      if (!selectedCommandId) return;
+      setCommands(prev => prev.map(c => c.id === selectedCommandId ? { ...c, waitDuration: newDuration } : c));
+  };
+
+  const handleSelectedStrokeWaitChange = (newDuration: number) => {
+      if (!selectedCommandId) return;
+      setCommands(prev => prev.map(c => {
+          if (c.id !== selectedCommandId) return c;
+          
+          let newMetadata = c.strokeMetadata ? [...c.strokeMetadata] : [];
+          // Ensure metadata exists for all strokes
+          while (newMetadata.length < c.strokes.length) {
+              newMetadata.push({});
+          }
+          
+          if (selectedStrokeIndex !== null && selectedStrokeIndex < c.strokes.length) {
+             // Specific stroke
+             newMetadata[selectedStrokeIndex] = { ...newMetadata[selectedStrokeIndex], waitAfter: newDuration };
+          } else {
+             // If no stroke selected, maybe update global default? Or update ALL?
+             // User requested individual editing. "If not selected, global editing".
+             // We already separate that in UI. If this is called, it SHOULD correspond to a selected stroke OR explicitly global.
+             // But the UI slider calls this handler.
+             // If selectedStrokeIndex is null, we shouldn't be calling "SelectedStrokeWaitChange".
+             // But let's support "Update All" here if needed? No, use handleWaitDurationChange for that.
+             // So this does nothing if index is null.
+             return c;
+          }
+          
+          return { ...c, strokeMetadata: newMetadata };
+      }));
+  };
+
+  const currentStrokeWait = useMemo(() => {
+      if (!selectedCommand || selectedStrokeIndex === null) return undefined;
+      const meta = selectedCommand.strokeMetadata?.[selectedStrokeIndex];
+      return meta?.waitAfter; // Returns undefined if not set, UI shows default
+  }, [selectedCommand, selectedStrokeIndex]);
 
   return (
-    <div ref={appRef} className="flex h-screen bg-gray-100 overflow-hidden">
-      {isFullscreen && (
-        <button
-          onClick={handleExitFullscreen}
-          className="fixed top-4 right-4 z-[9999] p-2 bg-white/80 hover:bg-white rounded-full shadow-lg transition-colors duration-200"
-          title="Exit Fullscreen"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        </button>
-      )}
-
-      {!isFullscreen && isSidebarOpen && (
+    <div className="flex h-screen bg-gray-100 overflow-hidden" ref={appRef}>
+      <div className={`${isSidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300 ease-in-out overflow-hidden flex-shrink-0`}>
         <Sidebar
-          files={files}
-          selectedFileId={selectedFileId}
-          onSelectFile={setSelectedFileId}
-          onSelectCommand={handleSelectCommand}
-          onDeleteFile={handleDeleteFile}
-          onToggleVisibility={handleToggleVisibility}
+          commands={commands}
+          selectedCommandId={selectedCommandId}
+          onSelectCommand={setSelectedCommandId}
+          onDeleteCommand={(id) => setCommands(prev => prev.filter(c => c.id !== id))}
+          onToggleVisibility={(id) => setCommands(prev => prev.map(c => c.id === id ? { ...c, isVisible: !c.isVisible } : c))}
           onFileUpload={handleFileUpload}
-          onCreateNew={handleCreateNewFile}
-          onExportVisible={handleExportVisible}
-          onToggleCommandVisibility={handleToggleCommandVisibility}
-          onToggleAllVisibility={handleToggleAllVisibility}
-          onRenameFile={handleRenameFile}
-          onRenameCommand={handleRenameCommand}
-          onDeleteCommand={handleDeleteCommand}
-          onAddCommandToFile={handleAddCommandToFile}
-          onAddTapCommand={handleAddTapCommand}
-          onExportFile={handleExportFile}
+          onCreateNew={handleCreateNewCommand}
+          onRenameCommand={(id, name) => setCommands(prev => prev.map(c => c.id === id ? { ...c, name } : c))}
+          onUpdateCommand={(updatedCmd) => setCommands(prev => prev.map(c => c.id === updatedCmd.id ? updatedCmd : c))}
+          selectedStrokeIndex={selectedStrokeIndex}
+          onSelectStroke={setSelectedStrokeIndex}
         />
-      )}
+      </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden relative">
-        {!isFullscreen && (
-          <header className="bg-white shadow-sm p-4 z-10 flex items-center">
-            <button
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="mr-4 text-gray-600 hover:text-gray-900 focus:outline-none"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Header (Simplified) */}
+        <div className="h-12 bg-white border-b flex items-center justify-between px-4">
+          <div className="flex items-center">
+            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-1 mr-2 rounded hover:bg-gray-200">
+              {isSidebarOpen ? '◀' : '▶'}
             </button>
-            <h1 className="text-2xl font-bold text-gray-900">Voice Control Commander</h1>
-          </header>
-        )}
+            <h1 className="font-semibold text-gray-700">Voice Control Commander</h1>
+          </div>
+          <div className="flex items-center space-x-2">
+            <button onClick={handleExport} className="px-3 py-1 bg-purple-600 text-white rounded text-sm hover:bg-purple-700">
+              Export
+            </button>
+          </div>
+        </div>
 
-        <main className={`flex-1 overflow-hidden ${isFullscreen ? 'p-0 flex items-center justify-center bg-gray-900' : 'p-8'}`}>
-          {selectedFile ? (
-            <div className={`${isFullscreen ? 'w-full h-full flex items-center justify-center' : 'grid grid-cols-1 lg:grid-cols-3 gap-8 h-full'}`}>
-              <div className={`${isFullscreen ? 'w-full h-full flex items-center justify-center' : 'lg:col-span-2 h-full overflow-hidden flex flex-col'}`}>
-                <Canvas
-                  paths={canvasPaths}
-                  width={selectedDevice.width}
-                  height={selectedDevice.height}
-                  backgroundImage={backgroundImage}
-                  showGrid={showGrid}
-                  style={isFullscreen ? { maxHeight: '95vh' } : { maxHeight: '100%', width: 'auto', height: 'auto' }}
-                  onPathDrag={handlePathDrag}
-                  onSelectCommand={handleSelectCommand}
-                  simulationProgress={simulationProgress}
-                />
-                {!isFullscreen && (
-                  <div className="mt-4 text-sm text-gray-500 flex-shrink-0 flex justify-between items-center">
-                    <div>
-                      ファイル: {selectedFile.name} | コマンド: {selectedCommand?.name || 'なし'} | デバイス: {selectedDevice.name} ({selectedDevice.width}x{selectedDevice.height})
-                    </div>
-                    <div className="flex items-center space-x-4 text-xs text-gray-600">
-                      <div className="flex items-center">
-                        <span className="w-3 h-3 rounded-full bg-green-500 mr-1"></span>
-                        <span>始点 (Start)</span>
-                      </div>
-                      <div className="flex items-center">
-                        <span className="w-3 h-3 rounded-full bg-red-500 mr-1"></span>
-                        <span>終点 (End)</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+        <div className="flex-1 flex overflow-hidden relative">
+          <div 
+            ref={scrollContainerRef}
+            className="flex-1 bg-gray-100 overflow-auto relative"
+          >
+            <div className="min-w-full min-h-full p-16 flex items-start justify-center">
+            <Canvas
+              width={selectedDevice.width}
+              height={selectedDevice.height}
+              backgroundImage={backgroundImage}
+              paths={canvasPaths}
+              showGrid={showGrid}
+              onPathDrag={handlePathDrag}
+              onSelectCommand={(_, cmdId, pathId) => {
+                // Parse stroke index from pathId if available (format: `${cmdId}_stroke_${index}`)
+                let strokeIndex: number | null = null;
+                if (pathId) {
+                  const match = pathId.match(/_stroke_(\d+)$/);
+                  if (match) {
+                    strokeIndex = parseInt(match[1], 10);
+                  }
+                }
 
-              {(!isFullscreen || showSettingsPopup) && (
-                <div className={`${isFullscreen ? 'absolute top-16 right-4 w-96 z-50 max-h-[80vh] overflow-y-auto' : 'h-full pr-2 min-h-0'}`}>
-                  <ControlPanel
-                    offsetX={selectedFile.offsetX}
-                    offsetY={selectedFile.offsetY}
-                    onOffsetXChange={(val) => updateSelectedFile({ offsetX: val })}
-                    onOffsetYChange={(val) => updateSelectedFile({ offsetY: val })}
-                    onExport={handleExport}
-                    devices={DEVICES}
-                    selectedDeviceId={selectedDeviceId}
-                    onSelectDevice={setSelectedDeviceId}
-                    onBackgroundImageUpload={handleBackgroundImageUpload}
-                    onClearBackgroundImage={handleClearBackgroundImage}
-                    showGrid={showGrid}
-                    onToggleGrid={setShowGrid}
-                    onEnterFullscreen={handleEnterFullscreen}
-                    duration={duration}
-                    onDurationChange={(newDuration) => {
-                      setDuration(newDuration);
-                      if (selectedFileId && selectedFile?.selectedCommandId) {
-                        setFiles(prev => prev.map(f => {
-                          if (f.id === selectedFileId) {
-                            return {
-                              ...f,
-                              commands: f.commands.map(c => {
-                                if (c.id === f.selectedCommandId) {
-                                  // Resample points based on new duration
-                                  // But wait, if we resample, we lose the original "key" points if we are not careful.
-                                  // However, for Voice Control, the points ARE the definition.
-                                  // So resampling is the correct way to change speed.
-                                  // But we should be careful not to degrade quality too much if user toggles back and forth.
-                                  // Ideally we store "original path" but that's complex.
-                                  // For now, resampling the *current* points is the standard way.
-
-                                  // Special case: If it's a Tap (1 point originally), we want to keep it as "Tap" conceptually?
-                                  // If we resample a 1-point tap to 6 points, it becomes a "hold".
-                                  // But the user wants to regulate time.
-                                  // If we resample, it becomes multiple points.
-                                  // Does our Canvas handle multiple points at same location as a Tap?
-                                  // Our Canvas checks `points.length === 1`.
-                                  // If we have 6 points at same location, Canvas will draw it as a line (dot).
-                                  // We might need to update Canvas to treat "all points same" as Tap.
-                                  // OR, we keep `points` as 1 point in the state, but expand it during export?
-                                  // But the user said "time cannot be regulated".
-                                  // If we want the simulation to work, we need points?
-                                  // Actually simulation uses `duration` state.
-                                  // So for simulation, we don't need to resample.
-                                  // But for EXPORT, we need to resample.
-
-                                  // User said "drag and tap".
-                                  // If I resample drag, it works.
-                                  // If I resample tap, it becomes multiple points.
-                                  // If I change tap to multiple points, Canvas might draw it as a very short line or dot.
-                                  // Let's try to keep it simple: Update duration metadata AND resample points.
-                                  // But if we resample tap to 6 points, Canvas will see length=6 and draw a line.
-                                  // We should update Canvas to handle this case or just accept it.
-                                  // Actually, if points are identical, `ctx.lineTo` does nothing visible.
-                                  // But `isPointOnPath` might be weird.
-
-                                  // Let's use `resamplePath`.
-                                  const newPoints = resamplePath(c.points, newDuration);
-                                  return { ...c, points: newPoints, duration: newDuration };
-                                }
-                                return c;
-                              })
-                            };
-                          }
-                          return f;
-                        }));
-                      }
-                    }}
-                    isPlaying={isPlaying}
-                    onTogglePlay={togglePlay}
-                    angle={angle}
-                    onAngleChange={handleAngleChange}
-                    length={length}
-                    onLengthChange={handleLengthChange}
-                    absoluteX={selectedCommand && selectedFile ? selectedCommand.points[0].x + selectedFile.offsetX : undefined}
-                    absoluteY={selectedCommand && selectedFile ? selectedCommand.points[0].y + selectedFile.offsetY : undefined}
-                    onCurve={handleCurve}
-                  />
-                </div>
-              )}
-
-              {isFullscreen && (
-                <button
-                  onClick={() => setShowSettingsPopup(!showSettingsPopup)}
-                  className="fixed top-4 right-16 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg z-50 transition duration-200"
-                  title="Settings"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </button>
-              )}
+                setSelectedCommandId(cmdId);
+                setSelectedStrokeIndex(strokeIndex);
+              }}
+              connections={canvasConnections}
+            onSelectWait={setSelectedStrokeIndex}
+            markerPosition={markerPosition}
+              scale={scale}
+            />
             </div>
-          ) : (
-            <div className="flex items-center justify-center h-full text-gray-400">
-              <div className="text-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <p className="text-xl mb-6">ファイルを選択またはアップロードして開始してください</p>
 
-                <div className="flex justify-center space-x-4">
-                  <label className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 cursor-pointer transition duration-200">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                    </svg>
-                    ファイルを読み込む
-                    <input type="file" className="hidden" accept=".voicecontrolcommands,.plist" onChange={(e) => {
-                      if (e.target.files && e.target.files.length > 0) {
-                        handleFileUpload(e.target.files[0]);
-                        e.target.value = '';
-                      }
-                    }} />
-                  </label>
-
-                  <button
-                    onClick={handleCreateNewFile}
-                    className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition duration-200"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    新規ファイル
-                  </button>
-                </div>
-              </div>
+            {/* Overlay Controls */}
+            <div className="absolute top-4 right-4 flex flex-col space-y-2">
+              <button onClick={togglePlay} className="p-2 bg-blue-600 text-white rounded shadow">
+                {isPlaying ? 'Stop' : 'Play'}
+              </button>
             </div>
-          )}
-        </main>
+          </div>
+
+          <ControlPanel
+            models={DEVICE_MODELS}
+            selectedModelId={selectedModelId}
+            onSelectModel={setSelectedModelId}
+            orientation={orientation}
+            onSelectOrientation={setOrientation}
+            scale={scale}
+            onScaleChange={setScale}
+            onNudge={(dx, dy) => {
+              if (dx !== 0) handleNudge('x', dx);
+              if (dy !== 0) handleNudge('y', dy);
+            }}
+            onExport={handleExport}
+            onBackgroundImageUpload={handleBackgroundImageUpload}
+            onClearBackgroundImage={handleClearBackgroundImage}
+            showGrid={showGrid}
+            onToggleGrid={() => setShowGrid(!showGrid)}
+            onEnterFullscreen={handleEnterFullscreen}
+            duration={duration}
+            onDurationChange={(newDur) => {
+              if (selectedStrokeIndex !== null) {
+                // Update specific stroke
+                const points = getSelectedStrokePoints();
+                if (!points || points.length < 2) return;
+
+                // Resample to new duration (approximate points count)
+                // newDur is in seconds. 60 points per second.
+                // resamplePath expects duration in seconds if that's how it's defined.
+                // Checking previous usage: resamplePath(points, currentDuration)
+                const newPoints = resamplePath(points, newDur);
+                updateSelectedStroke(newPoints);
+              }
+            }}
+            isPlaying={isPlaying}
+            onTogglePlay={togglePlay}
+            angle={currentAngle}
+            onAngleChange={handleAngleChange}
+            length={currentLength}
+            onLengthChange={handleLengthChange}
+            onCurve={handleCurve}
+            absoluteX={currentHeadX}
+            absoluteY={currentHeadY}
+            isActionSelected={selectedStrokeIndex !== null}
+            waitDuration={selectedCommand?.waitDuration !== undefined ? selectedCommand.waitDuration : 0.2}
+            onWaitDurationChange={handleWaitDurationChange}
+            selectedStrokeWait={currentStrokeWait}
+            onSelectedStrokeWaitChange={handleSelectedStrokeWaitChange}
+          />
+        </div>
       </div>
     </div>
   );
-}
+};
+
 
 export default App;
-
