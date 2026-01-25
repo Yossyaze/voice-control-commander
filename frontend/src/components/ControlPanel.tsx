@@ -41,6 +41,7 @@ interface ControlPanelProps {
     selectedStrokeWait?: number;
     onSelectedStrokeWaitChange?: (duration: number) => void;
     selectionType?: 'stroke' | 'wait';
+    onDeleteSelectedAction?: () => void;
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = ({
@@ -75,7 +76,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   onWaitDurationChange,
   selectedStrokeWait,
   onSelectedStrokeWaitChange,
-  selectionType = 'stroke'
+  selectionType = 'stroke',
+  onDeleteSelectedAction
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -292,6 +294,16 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
                             </svg>
                             Apply Random Curve
+                        </button>
+
+                        <button 
+                            onClick={onDeleteSelectedAction}
+                            className="w-full flex items-center justify-center px-4 py-2 mt-2 border border-red-200 shadow-sm text-xs font-medium rounded-md text-red-600 bg-white hover:bg-red-50 transition-colors"
+                        >
+                            <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Delete Action
                         </button>
                      </div>
                  </div>

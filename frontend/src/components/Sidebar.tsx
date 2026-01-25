@@ -204,21 +204,22 @@ const Sidebar: React.FC<SidebarProps> = ({
                                                             <span className="ml-2 text-[10px] opacity-60">({isTap(stroke) ? 'Tap' : 'Path'})</span>
                                                         </div>
                                                         {/* Delete Stroke Button */}
-                                                        {cmd.strokes.length > 1 && (
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    const newStrokes = [...cmd.strokes];
-                                                                    newStrokes.splice(index, 1);
-                                                                    onUpdateCommand({ ...cmd, strokes: newStrokes });
-                                                                    if (selectedStrokeIndex === index) onSelectStroke(null);
-                                                                    else if (selectedStrokeIndex !== null && index < selectedStrokeIndex) onSelectStroke(selectedStrokeIndex - 1);
-                                                                }}
-                                                                className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 px-1"
-                                                            >
-                                                                ×
-                                                            </button>
-                                                        )}
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                const newStrokes = [...cmd.strokes];
+                                                                newStrokes.splice(index, 1);
+                                                                onUpdateCommand({ ...cmd, strokes: newStrokes });
+                                                                if (selectedStrokeIndex === index) onSelectStroke(null);
+                                                                else if (selectedStrokeIndex !== null && index < selectedStrokeIndex) onSelectStroke(selectedStrokeIndex - 1);
+                                                            }}
+                                                            className={`p-1 hover:text-red-500 hover:bg-red-50 rounded transition-colors ${selectedStrokeIndex === index ? 'text-blue-300' : 'text-gray-300'}`}
+                                                            title="Delete Action"
+                                                        >
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                            </svg>
+                                                        </button>
                                                     </div>
                                                 </React.Fragment>
                                             ))}

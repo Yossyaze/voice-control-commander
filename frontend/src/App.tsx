@@ -618,6 +618,30 @@ function App() {
     }
   }, [selectedCommand, selectedStrokeIndex]); // Add selectedStrokeIndex dependency
 
+  const handleDeleteSelectedAction = useCallback(() => {
+    if (!selectedCommandId || selectedStrokeIndex === null) return;
+    
+    setCommands(prev => prev.map(cmd => {
+      if (cmd.id !== selectedCommandId) return cmd;
+      const newStrokes = [...cmd.strokes];
+      if (selectedStrokeIndex < newStrokes.length) {
+         newStrokes.splice(selectedStrokeIndex, 1);
+      }
+      return { ...cmd, strokes: newStrokes };
+    }));
+    
+    // Adjust selection
+    if (selectedStrokeIndex > 0) {
+        setSelectedStrokeIndex(selectedStrokeIndex - 1);
+    } else {
+        setSelectedStrokeIndex(null); // Deselect if 0 was deleted, or maybe stay null
+        // If there are still strokes, maybe select 0? 
+        // Logic: if 0 deleted and others remain -> select new 0?
+        // Let's stick to null (command selection) to be safe or index 0 if exists?
+        // Let's just go null for now.
+    }
+  }, [selectedCommandId, selectedStrokeIndex]);
+
 
   // Prepare canvas paths: Flatten all strokes of all visible commands
   const canvasPaths = useMemo(() => {
@@ -1149,6 +1173,7 @@ function App() {
           selectedStrokeWait={currentStrokeWait}
           onSelectedStrokeWaitChange={handleSelectedStrokeWaitChange}
           selectionType={selectionType}
+          onDeleteSelectedAction={handleDeleteSelectedAction}
         />
          {/* Close button for fullscreen popup mode */}
          {isFullscreen && isRightSidebarOpen && (
