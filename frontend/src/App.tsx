@@ -1,5 +1,6 @@
 
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { arrayMove } from '@dnd-kit/sortable';
 import Canvas from './components/Canvas';
 import ControlPanel from './components/ControlPanel';
 import Sidebar from './components/Sidebar';
@@ -853,6 +854,39 @@ function App() {
 
       return { ...cmd, strokes: newStrokes, points: newLegacyPoints };
     }));
+
+  };
+
+  const handleReorderCommands = (oldIndex: number, newIndex: number) => {
+    setCommands((items) => arrayMove(items, oldIndex, newIndex));
+  };
+
+  const handleReorderStrokes = (commandId: string, oldIndex: number, newIndex: number) => {
+    setCommands((prev) => prev.map((cmd) => {
+      if (cmd.id !== commandId) return cmd;
+      const newStrokes = arrayMove(cmd.strokes, oldIndex, newIndex);
+      // We also need to reorder metadata if it exists
+      let newMetadata = cmd.strokeMetadata ? [...cmd.strokeMetadata] : [];
+      // Ensure metadata is long enough before moving
+      while(newMetadata.length < cmd.strokes.length) { newMetadata.push({}); }
+      newMetadata = arrayMove(newMetadata, oldIndex, newIndex);
+      
+      return { ...cmd, strokes: newStrokes, strokeMetadata: newMetadata };
+    }));
+    // If selectedStrokeIndex was pointing to the moved item, we might need to update it,
+    // but simpler to just deselect or keep index?
+    // If we move item at index A to B. And we effectively selected index A.
+    // If we keep selection index A, we are now selecting a different item.
+    // Let's try to track the selection.
+    if (selectedCommandId === commandId && selectedStrokeIndex !== null) {
+       if (selectedStrokeIndex === oldIndex) {
+           setSelectedStrokeIndex(newIndex);
+       } else if (oldIndex < selectedStrokeIndex && newIndex >= selectedStrokeIndex) {
+           setSelectedStrokeIndex(selectedStrokeIndex - 1);
+       } else if (oldIndex > selectedStrokeIndex && newIndex <= selectedStrokeIndex) {
+           setSelectedStrokeIndex(selectedStrokeIndex + 1);
+       }
+    }
   };
 
 
@@ -976,6 +1010,9 @@ function App() {
           onSelectStroke={setSelectedStrokeIndex}
           selectionType={selectionType}
           onSelectType={setSelectionType}
+
+          onReorderCommands={handleReorderCommands}
+          onReorderStrokes={handleReorderStrokes}
         />
         {/* Close button for fullscreen popup mode */}
         {isFullscreen && isLeftSidebarOpen && (
