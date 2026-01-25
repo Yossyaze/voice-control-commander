@@ -135,7 +135,8 @@ function App() {
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState<boolean>(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+  const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState<boolean>(true);
+  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState<boolean>(true);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
   // Remove unused state
@@ -843,8 +844,9 @@ function App() {
   const handleClearBackgroundImage = () => setBackgroundImage(null);
   const handleToggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
-        // Auto-close sidebar when entering fullscreen for better initial view
-        setIsSidebarOpen(false);
+        // Auto-close both sidebars when entering fullscreen
+        setIsLeftSidebarOpen(false);
+        setIsRightSidebarOpen(false);
         appRef.current?.requestFullscreen().catch(err => {
             console.error(`Error attempting to enable fullscreen: ${err.message}`);
         });
@@ -926,8 +928,16 @@ function App() {
   }, [selectedCommand, selectedStrokeIndex]);
 
   return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden" ref={appRef}>
-      <div className={`${isSidebarOpen ? 'w-64' : 'w-0'} ${isFullscreen ? 'absolute z-50 h-full shadow-2xl border-r border-gray-200' : ''} transition-all duration-300 ease-in-out overflow-hidden flex-shrink-0 bg-white`}>
+    <div className="flex h-screen bg-gray-50 overflow-hidden font-sans text-gray-900" ref={appRef}>
+      
+      {/* Left Sidebar */}
+      <div 
+        className={`
+            ${isLeftSidebarOpen ? 'w-64' : 'w-0'} 
+            ${isFullscreen ? 'absolute left-0 z-50 h-full shadow-2xl' : 'relative'}
+            transition-all duration-300 ease-in-out flex-shrink-0 bg-white border-r border-gray-200 overflow-hidden
+        `}
+      >
         <Sidebar
           commands={commands}
           selectedCommandId={selectedCommandId}
@@ -943,124 +953,216 @@ function App() {
           selectionType={selectionType}
           onSelectType={setSelectionType}
         />
+        {/* Close button for fullscreen popup mode */}
+        {isFullscreen && isLeftSidebarOpen && (
+            <button 
+                onClick={() => setIsLeftSidebarOpen(false)}
+                className="absolute top-2 right-2 p-1 bg-gray-100 rounded-full hover:bg-gray-200"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        )}
       </div>
 
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Header (Simplified) */}
-        <div className="h-12 bg-white border-b flex items-center justify-between px-4">
-          <div className="flex items-center">
-            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-1 mr-2 rounded hover:bg-gray-200">
-              {isSidebarOpen ? '◀' : '▶'}
+      {/* Center Area */}
+      <div className="flex-1 flex flex-col min-w-0 bg-gray-50 relative">
+        {/* Fullscreen Hover Zones */}
+        {isFullscreen && (
+            <>
+                {/* Left Hover Zone */}
+                <div 
+                    className="absolute left-0 top-0 bottom-0 w-4 z-40 hover:bg-blue-500/10 transition-colors cursor-pointer flex items-center justify-start group"
+                    onClick={() => setIsLeftSidebarOpen(true)}
+                    title="Open Sidebar"
+                >
+                    <div className="h-12 w-1 bg-blue-500/50 rounded-r opacity-0 group-hover:opacity-100 transition-opacity ml-0.5" />
+                </div>
+                {/* Right Hover Zone */}
+                <div 
+                    className="absolute right-0 top-0 bottom-0 w-4 z-40 hover:bg-blue-500/10 transition-colors cursor-pointer flex items-center justify-end group"
+                    onClick={() => setIsRightSidebarOpen(true)}
+                    title="Open Settings"
+                >
+                    <div className="h-12 w-1 bg-blue-500/50 rounded-l opacity-0 group-hover:opacity-100 transition-opacity mr-0.5" />
+                </div>
+            </>
+        )}
+
+        {/* Header (Hidden in fullscreen usually, or kept? Plan said keep functionality but fullscreen usually hides chrome. 
+            Let's keep separate header if not fullscreen, or overlays if fullscreen.
+            For "Clean Studio", a persistent top bar is good unless maximized.
+        */}
+        {!isFullscreen && (
+        <div className="h-12 bg-white border-b border-gray-200 flex items-center justify-between px-4 text-sm select-none">
+          <div className="flex items-center space-x-3">
+            <button onClick={() => setIsLeftSidebarOpen(!isLeftSidebarOpen)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded transition-colors">
+               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  {isLeftSidebarOpen 
+                    ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /> // Menu icon (open)
+                    : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /> // Menu icon (closed) - keep same or change? Let's use Sidebar icon
+                  }
+               </svg>
             </button>
-            <h1 className="font-semibold text-gray-700">Voice Control Commander</h1>
+            <h1 className="font-semibold text-gray-700 tracking-tight">Voice Control Commander</h1>
           </div>
-          <div className="flex items-center space-x-2">
-            <button onClick={handleExport} className="px-3 py-1 bg-purple-600 text-white rounded text-sm hover:bg-purple-700">
+          <div className="flex items-center space-x-3">
+             <button onClick={() => setIsRightSidebarOpen(!isRightSidebarOpen)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+            </button>
+            <div className="h-4 w-px bg-gray-300 mx-2" />
+            <button onClick={handleExport} className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 shadow-sm transition-colors">
               Export
             </button>
           </div>
         </div>
+        )}
 
-        <div className="flex-1 flex overflow-hidden relative">
+        {/* Canvas Area */}
+        <div className="flex-1 overflow-hidden relative">
           <div 
             ref={scrollContainerRef}
-            className="flex-1 bg-gray-100 overflow-auto relative"
+            className="w-full h-full overflow-auto relative flex items-center justify-center bg-gray-50/50"
           >
-            <div className="min-w-full min-h-full p-16 flex items-start justify-center">
-            <Canvas
-              width={selectedDevice.width}
-              height={selectedDevice.height}
-              backgroundImage={backgroundImage}
-              paths={canvasPaths}
-              showGrid={showGrid}
-              onPathDrag={handlePathDrag}
-              onSelectCommand={(_, cmdId, pathId) => {
-                // Parse stroke index from pathId if available (format: `${cmdId}_stroke_${index}`)
-                let strokeIndex: number | null = null;
-                if (pathId) {
-                  const match = pathId.match(/_stroke_(\d+)$/);
-                  if (match) {
-                    strokeIndex = parseInt(match[1], 10);
-                  }
-                }
+            <div className="p-16">
+                <Canvas
+                width={selectedDevice.width}
+                height={selectedDevice.height}
+                backgroundImage={backgroundImage}
+                paths={canvasPaths}
+                showGrid={showGrid}
+                onPathDrag={handlePathDrag}
+                onSelectCommand={(_, cmdId, pathId) => {
+                    let strokeIndex: number | null = null;
+                    if (pathId) {
+                    const match = pathId.match(/_stroke_(\d+)$/);
+                    if (match) {
+                        strokeIndex = parseInt(match[1], 10);
+                    }
+                    }
 
-                setSelectedCommandId(cmdId);
-                setSelectedStrokeIndex(strokeIndex);
-              }}
-              connections={canvasConnections.map(c => ({
-                  ...c,
-                  // We can pass isSelected here if we want highlighting in canvas
-                  isSelected: selectionType === 'wait' && selectedStrokeIndex === c.strokeIndex
-              }))}
-            onSelectWait={(index) => {
-                setSelectedStrokeIndex(index);
-                setSelectionType('wait');
-            }}
-            markerPosition={markerPosition}
-              scale={scale}
-            />
-            </div>
-
-            {/* Overlay Controls */}
-            <div className="absolute top-4 right-4 flex flex-col space-y-2">
-              <button onClick={togglePlay} className="p-2 bg-blue-600 text-white rounded shadow">
-                {isPlaying ? 'Stop' : 'Play'}
-              </button>
+                    setSelectedCommandId(cmdId);
+                    setSelectedStrokeIndex(strokeIndex);
+                    // Also open settings if closed?
+                    if (!isRightSidebarOpen && !isFullscreen) setIsRightSidebarOpen(true);
+                }}
+                connections={canvasConnections.map(c => ({
+                    ...c,
+                    isSelected: selectionType === 'wait' && selectedStrokeIndex === c.strokeIndex
+                }))}
+                onSelectWait={(index) => {
+                    setSelectedStrokeIndex(index);
+                    setSelectionType('wait');
+                    if (!isRightSidebarOpen && !isFullscreen) setIsRightSidebarOpen(true);
+                }}
+                markerPosition={markerPosition}
+                scale={scale}
+                />
             </div>
           </div>
 
-          <ControlPanel
-            models={DEVICE_MODELS}
-            selectedModelId={selectedModelId}
-            onSelectModel={setSelectedModelId}
-            orientation={orientation}
-            onSelectOrientation={setOrientation}
-            scale={scale}
-            onScaleChange={setScale}
-            onNudge={(dx, dy) => {
-              if (dx !== 0) handleNudge('x', dx);
-              if (dy !== 0) handleNudge('y', dy);
-            }}
-            onExport={handleExport}
-            onBackgroundImageUpload={handleBackgroundImageUpload}
-            onClearBackgroundImage={handleClearBackgroundImage}
-            showGrid={showGrid}
-            onToggleGrid={() => setShowGrid(!showGrid)}
-            onEnterFullscreen={handleToggleFullscreen}
-            isFullscreen={isFullscreen}
-            duration={duration}
-            onDurationChange={(newDur) => {
-              if (selectedStrokeIndex !== null) {
-                // Update specific stroke
-                const points = getSelectedStrokePoints();
-                if (!points || points.length < 2) return;
-
-                // Resample to new duration (approximate points count)
-                // newDur is in seconds. 60 points per second.
-                // resamplePath expects duration in seconds if that's how it's defined.
-                // Checking previous usage: resamplePath(points, currentDuration)
-                const newPoints = resamplePath(points, newDur);
-                updateSelectedStroke(newPoints);
-              }
-            }}
-            isPlaying={isPlaying}
-            onTogglePlay={togglePlay}
-            angle={currentAngle}
-            onAngleChange={handleAngleChange}
-            length={currentLength}
-            onLengthChange={handleLengthChange}
-            onCurve={handleCurve}
-            absoluteX={currentHeadX}
-            absoluteY={currentHeadY}
-            isActionSelected={selectedStrokeIndex !== null}
-            waitDuration={selectedCommand?.waitDuration !== undefined ? selectedCommand.waitDuration : 0.2}
-            onWaitDurationChange={handleWaitDurationChange}
-            selectedStrokeWait={currentStrokeWait}
-            onSelectedStrokeWaitChange={handleSelectedStrokeWaitChange}
-            selectionType={selectionType}
-          />
+          {/* Overlay Play Controls (Floating) */}
+          <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex space-x-2 z-30">
+             <button 
+                onClick={togglePlay} 
+                className={`flex items-center space-x-2 px-5 py-2.5 rounded-full shadow-lg backdrop-blur-md border border-white/20 transition-all transform hover:scale-105 active:scale-95 ${
+                    isPlaying 
+                    ? 'bg-red-500/90 text-white' 
+                    : 'bg-white/90 text-gray-800 hover:bg-white'
+                }`}
+             >
+                {isPlaying ? (
+                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd" /></svg>
+                ) : (
+                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-0.5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" /></svg>
+                )}
+                <span className="font-medium text-sm">{isPlaying ? 'Stop' : 'Play'}</span>
+             </button>
+             {/* Quick Fullscreen Toggle for center access */}
+             <button 
+                onClick={handleToggleFullscreen}
+                className="p-2.5 bg-white/90 text-gray-600 rounded-full shadow-lg backdrop-blur-md border border-white/20 hover:bg-white transition-all transform hover:scale-105 active:scale-95"
+                title="Toggle Fullscreen"
+             >
+                 {isFullscreen ? (
+                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                 ) : (
+                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
+                 )}
+             </button>
+          </div>
         </div>
       </div>
+
+      {/* Right Sidebar (Control Panel) */}
+      <div 
+        className={`
+            ${isRightSidebarOpen ? 'w-72' : 'w-0'} 
+            ${isFullscreen ? 'absolute right-0 z-50 h-full shadow-2xl' : 'relative'}
+            transition-all duration-300 ease-in-out flex-shrink-0 bg-white border-l border-gray-200 overflow-hidden
+        `}
+      >
+        <ControlPanel
+          models={DEVICE_MODELS}
+          selectedModelId={selectedModelId}
+          onSelectModel={setSelectedModelId}
+          orientation={orientation}
+          onSelectOrientation={setOrientation}
+          scale={scale}
+          onScaleChange={setScale}
+          onNudge={(dx, dy) => {
+            if (dx !== 0) handleNudge('x', dx);
+            if (dy !== 0) handleNudge('y', dy);
+          }}
+          onExport={handleExport}
+          onBackgroundImageUpload={handleBackgroundImageUpload}
+          onClearBackgroundImage={handleClearBackgroundImage}
+          showGrid={showGrid}
+          onToggleGrid={() => setShowGrid(!showGrid)}
+          onEnterFullscreen={handleToggleFullscreen}
+          isFullscreen={isFullscreen}
+          duration={duration}
+          onDurationChange={(newDur) => {
+            if (selectedStrokeIndex !== null) {
+              const points = getSelectedStrokePoints();
+              if (!points || points.length < 2) return;
+              const newPoints = resamplePath(points, newDur);
+              updateSelectedStroke(newPoints);
+            }
+          }}
+          isPlaying={isPlaying}
+          onTogglePlay={togglePlay}
+          angle={currentAngle}
+          onAngleChange={handleAngleChange}
+          length={currentLength}
+          onLengthChange={handleLengthChange}
+          onCurve={handleCurve}
+          absoluteX={currentHeadX}
+          absoluteY={currentHeadY}
+          isActionSelected={selectedStrokeIndex !== null}
+          waitDuration={selectedCommand?.waitDuration !== undefined ? selectedCommand.waitDuration : 0.2}
+          onWaitDurationChange={handleWaitDurationChange}
+          selectedStrokeWait={currentStrokeWait}
+          onSelectedStrokeWaitChange={handleSelectedStrokeWaitChange}
+          selectionType={selectionType}
+        />
+         {/* Close button for fullscreen popup mode */}
+         {isFullscreen && isRightSidebarOpen && (
+            <button 
+                onClick={() => setIsRightSidebarOpen(false)}
+                className="absolute top-2 left-2 p-1 bg-gray-100 rounded-full hover:bg-gray-200"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        )}
+      </div>
+
     </div>
   );
 };

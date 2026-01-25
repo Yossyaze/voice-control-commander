@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CommandsTable</key>
+	<dict>
+		<key>Custom.1769258556.14e87a</key>
+		<dict>
+			<key>CommandID</key>
+			<string>Custom.1769258556.14e87a</string>
+			<key>ConfirmationRequired</key>
+			<false/>
+			<key>CustomCommands</key>
+			<dict>
+				<key>en_US</key>
+				<array>
+					<string>Test Command</string>
+				</array>
+				<key>ja_JP</key>
+				<array>
+					<string>Test Command</string>
+				</array>
+			</dict>
+			<key>CustomGesture</key>
+			<data>
+			YnBsaXN0MDDUAQIDBAUGX2JZJGFyY2hpdmVyWCRvYmplY3RzVCR0
+			b3BYJHZlcnNpb25fEA9OU0tleWVkQXJjaGl2ZXKvEBsHCBESExQa
+			GyAhJS0uMjM1P0AgQi1HS0xSVltVJG51bGzUCQoLDA0ODxBWJGNs
+			YXNzWUFsbEV2ZW50c18QF0FyZVBvaW50c0RldmljZVJlbGF0aXZl
+			V1ZlcnNpb26AGoAZCBABV0ZpbmdlcnNWRm9yY2VzVFRpbWXSFRYX
+			GFgkY2xhc3Nlc1okY2xhc3NuYW1lohgZV05TVmFsdWVYTlNPYmpl
+			Y3RfEBh7MTAwLjAwMDAwMCwgMTAwLjAwMDAwMH3TCRwdHh8QW05T
+			LnBvaW50dmFsWk5TLnNwZWNpYWyABYAGEALSFRYiI6MjJBlfEBNO
+			U011dGFibGVEaWN0aW9uYXJ5XE5TRGljdGlvbmFyedMJJicoKStX
+			TlMua2V5c1pOUy5vYmplY3RzgAmhKoAIoSyAByMAAAAAAAAAANMJ
+			JicoLzChKqExgAsjQceSet4XVZrSFRY0JKIkGdMJJic2NzuADqM4
+			OTqAAoADgASjPD0+gAqADIANXxAYezIwMC4wMDAwMDAsIDIwMC4w
+			MDAwMDB90wkcHR5BEIAQ0wkmJyhDRaFEgBKhRoAR0wkmJyhISaFE
+			oUqAFCNBx5J63hl3vNMJJic2TU6jODk6o09QUYATgBWAFtIVFlNU
+			o1RVGV5OU011dGFibGVBcnJheVdOU0FycmF50gknV1iAGKJZWoAP
+			gBfSFRZcXaNdXhlfEBpBWE11dGFibGVSZXBsYXlhYmxlR2VzdHVy
+			ZV8QE0FYUmVwbGF5YWJsZUdlc3R1cmXRYGFUcm9vdIABEgABhqAA
+			CAARABsAJAApADIARABiAGgAcQB4AIIAnACkAKYAqACpAKsAswC6
+			AL8AxADNANgA2wDjAOwBBwEOARoBJQEnASkBKwEwATQBSgFXAV4B
+			ZgFxAXMBdQF3AXkBewGEAYsBjQGPAZEBmgGfAaIBqQGrAa8BsQGz
+			AbUBuQG7Ab0BvwHaAeEB4wHqAewB7gHwAfIB+QH7Af0B/wIIAg8C
+			EwIXAhkCGwIdAiICJgI1Aj0CQgJEAkcCSQJLAlACVAJxAocCigKP
+			ApEAAAAAAAACAQAAAAAAAABjAAAAAAAAAAAAAAAAAAAClg==
+			</data>
+			<key>CustomModifyDate</key>
+			<date>2026-01-24T12:42:36Z</date>
+			<key>CustomScope</key>
+			<string>com.apple.speech.SystemWideScope</string>
+			<key>CustomType</key>
+			<string>RunGesture</string>
+		</dict>
+	</dict>
+	<key>ExportDate</key>
+	<real>1769258556.182838</real>
+	<key>SystemVersion</key>
+	<dict>
+		<key>BuildID</key>
+		<string>7248A20C-D4C5-11F0-8B3C-9A234E799B22</string>
+		<key>ProductBuildVersion</key>
+		<string>23C55</string>
+		<key>ProductCopyright</key>
+		<string>1983-2025 Apple Inc.</string>
+		<key>ProductName</key>
+		<string>iPhone OS</string>
+		<key>ProductVersion</key>
+		<string>26.1</string>
+		<key>SystemImageID</key>
+		<string>A81059B2-172D-4149-9EA1-CB12DD872AFC</string>
+	</dict>
+</dict>
+</plist>
