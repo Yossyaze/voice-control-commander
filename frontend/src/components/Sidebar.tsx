@@ -107,32 +107,17 @@ const Sidebar: React.FC<SidebarProps> = ({
                                 <li key={cmd.id} className={`rounded-md border shadow-sm transition-all overflow-hidden ${isSelected ? 'border-blue-400 bg-white ring-1 ring-blue-100' : 'border-gray-300 bg-white hover:border-gray-300'}`}>
                                     {/* Command Header */}
                                     <div
-                                        className={`flex items-center justify-between px-3 py-3 cursor-pointer transition-colors group/item ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                                        className={`flex flex-col px-3 py-2 cursor-pointer transition-colors group/item ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
                                         onClick={() => {
                                             onSelectCommand(cmd.id);
                                             onSelectStroke(null); // Select the whole command context
                                             onSelectType?.('stroke');
                                         }}
                                     >
-                                        <div className="flex items-center flex-1 min-w-0 mr-2">
-                                            {/* Visibility Toggle (Always visible but dimmed if hidden) */}
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); onToggleVisibility(cmd.id); }}
-                                                className={`mr-2 focus:outline-none transition-colors p-1 rounded hover:bg-black/5 ${cmd.isVisible ? 'text-gray-400 hover:text-blue-500' : 'text-gray-300'}`}
-                                                title={cmd.isVisible ? "Hide" : "Show"}
-                                            >
-                                                {cmd.isVisible ? (
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                                        <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                                                        <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-                                                    </svg>
-                                                ) : (
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-300" xmlnsXlink="http://www.w3.org/1999/xlink" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z" clipRule="evenodd" /><path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.064 7 9.542 7 .847 0 1.669-.105 2.454-.303z" /></svg>
-                                                )}
-                                            </button>
-
+                                        {/* Row 1: Name and Color */}
+                                        <div className="flex items-center mb-1.5 min-w-0">
                                             {/* Color Indicator */}
-                                            <div className="w-3 h-3 rounded-md mr-3 ring-1 ring-black/10 flex-shrink-0 shadow-sm" style={{ backgroundColor: cmd.color }} />
+                                            <div className="w-2.5 h-2.5 rounded-full mr-2.5 ring-1 ring-black/10 flex-shrink-0 shadow-sm" style={{ backgroundColor: cmd.color }} />
 
                                             {/* Name */}
                                             {editingId === cmd.id ? (
@@ -148,21 +133,45 @@ const Sidebar: React.FC<SidebarProps> = ({
                                                 />
                                             ) : (
                                                 <span
-                                                    className={`text-sm font-bold truncate ${isSelected ? 'text-blue-900' : 'text-gray-700'}`}
+                                                    className={`text-sm font-bold truncate flex-1 ${isSelected ? 'text-blue-900' : 'text-gray-800'}`}
                                                     onDoubleClick={(e) => { e.stopPropagation(); handleStartEditing(cmd.id, cmd.name); }}
+                                                    title={cmd.name}
                                                 >
                                                     {cmd.name}
                                                 </span>
                                             )}
                                         </div>
 
-                                        {/* Action info / Delete */}
-                                        <div className="flex items-center">
-                                            <span className="text-[10px] text-gray-400 mr-2 font-mono bg-gray-100 px-1 rounded">{cmd.strokes.length}</span>
+                                        {/* Row 2: Controls and Info */}
+                                        <div className="flex items-center justify-between pl-5">
+                                             <div className="flex items-center space-x-3">
+                                                {/* Visibility Toggle */}
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); onToggleVisibility(cmd.id); }}
+                                                    className={`focus:outline-none transition-colors flex items-center space-x-1 ${cmd.isVisible ? 'text-gray-500 hover:text-blue-600' : 'text-gray-300'}`}
+                                                    title={cmd.isVisible ? "Hide" : "Show"}
+                                                >
+                                                    {cmd.isVisible ? (
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                                            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                                                            <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                                                        </svg>
+                                                    ) : (
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" xmlnsXlink="http://www.w3.org/1999/xlink" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z" clipRule="evenodd" /><path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.064 7 9.542 7 .847 0 1.669-.105 2.454-.303z" /></svg>
+                                                    )}
+                                                    <span className="text-[10px]">Visible</span>
+                                                </button>
+
+                                                <span className="text-[10px] text-gray-400 font-mono bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
+                                                    {cmd.strokes.length} steps
+                                                </span>
+                                             </div>
+
+                                             {/* Delete Button */}
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); onDeleteCommand(cmd.id); }}
-                                                className="text-gray-400 hover:text-red-600 hover:bg-red-50 rounded p-1.5 transition-colors"
-                                                title="Delete"
+                                                className="text-gray-400 hover:text-red-600 hover:bg-red-50 rounded p-1 transition-colors"
+                                                title="Delete Command"
                                             >
                                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
