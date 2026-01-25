@@ -72,9 +72,9 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className="w-64 bg-white flex flex-col h-full border-r border-gray-300 font-sans shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)] z-10">
             {/* Header / Toolbar */}
             <div className="h-12 px-4 border-b border-gray-300 bg-gray-50 flex items-center justify-between flex-shrink-0">
-                 <h2 className="text-xs font-bold text-gray-600 tracking-wider uppercase">Commands</h2>
+                 <h2 className="text-xs font-bold text-gray-600 tracking-wider uppercase">コマンド</h2>
                  <div className="flex items-center space-x-1">
-                    <label className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded cursor-pointer transition-colors" title="Import">
+                    <label className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded cursor-pointer transition-colors" title="インポート">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                         </svg>
@@ -86,7 +86,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                                 }
                             }} />
                     </label>
-                    <button onClick={onCreateNew} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors" title="New Command">
+                    <button onClick={onCreateNew} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors" title="新規コマンド">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                         </svg>
@@ -97,7 +97,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             {/* Command List */}
             <div className="flex-1 overflow-y-auto bg-gray-50 p-2 space-y-2">
                 {commands.length === 0 ? (
-                    <p className="text-gray-400 text-center mt-8 text-xs">No commands yet.</p>
+                    <p className="text-gray-400 text-center mt-8 text-xs">コマンドがありません</p>
                 ) : (
                     <ul className="space-y-2">
                         {commands.map((cmd) => {
@@ -149,7 +149,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); onToggleVisibility(cmd.id); }}
                                                     className={`focus:outline-none transition-colors flex items-center space-x-1 ${cmd.isVisible ? 'text-gray-500 hover:text-blue-600' : 'text-gray-300'}`}
-                                                    title={cmd.isVisible ? "Hide" : "Show"}
+                                                    title={cmd.isVisible ? "非表示" : "表示"}
                                                 >
                                                     {cmd.isVisible ? (
                                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -159,11 +159,11 @@ const Sidebar: React.FC<SidebarProps> = ({
                                                     ) : (
                                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" xmlnsXlink="http://www.w3.org/1999/xlink" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z" clipRule="evenodd" /><path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.064 7 9.542 7 .847 0 1.669-.105 2.454-.303z" /></svg>
                                                     )}
-                                                    <span className="text-[10px]">Visible</span>
+                                                    <span className="text-[10px]">表示中</span>
                                                 </button>
 
                                                 <span className="text-[10px] text-gray-400 font-mono bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
-                                                    {cmd.strokes.length} steps
+                                                    {cmd.strokes.length} ステップ
                                                 </span>
                                              </div>
 
@@ -171,7 +171,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); onDeleteCommand(cmd.id); }}
                                                 className="text-gray-400 hover:text-red-600 hover:bg-red-50 rounded p-1 transition-colors"
-                                                title="Delete Command"
+                                                title="コマンドを削除"
                                             >
                                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -194,7 +194,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                                                         >
                                                             <div className={`h-3 w-[2px] rounded-full ${selectedStrokeIndex === index - 1 && selectionType === 'wait' ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
                                                             <span className={`text-[10px] ml-2 ${selectedStrokeIndex === index - 1 && selectionType === 'wait' ? 'text-blue-700 font-bold' : 'text-gray-500'}`}>
-                                                                Wait {(cmd.strokeMetadata?.[index - 1]?.waitAfter ?? cmd.waitDuration ?? 0.2)}s
+                                                                待機 {(cmd.strokeMetadata?.[index - 1]?.waitAfter ?? cmd.waitDuration ?? 0.2)}秒
                                                             </span>
                                                         </div>
                                                     )}
@@ -209,9 +209,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                                                     >
                                                         <div className="flex items-center">
                                                             <div className={`w-2 h-2 rounded-full mr-2.5 ${selectedStrokeIndex === index && selectionType === 'stroke' ? 'bg-blue-500 ring-2 ring-blue-200' : 'bg-gray-400'}`}></div>
-                                                            <span>Action {index + 1}</span>
+                                                            <span>アクション {index + 1}</span>
                                                             <span className="ml-2 text-[9px] uppercase tracking-wider text-gray-400 bg-white px-1 rounded border border-gray-100">
-                                                                {isTap(stroke) ? 'Tap' : 'Path'}
+                                                                {isTap(stroke) ? 'タップ' : 'パス'}
                                                             </span>
                                                         </div>
                                                         {/* Delete Stroke Button */}
@@ -225,7 +225,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                                                                 else if (selectedStrokeIndex !== null && index < selectedStrokeIndex) onSelectStroke(selectedStrokeIndex - 1);
                                                             }}
                                                             className={`p-1 hover:text-red-500 hover:bg-red-100 rounded transition-colors ${selectedStrokeIndex === index ? 'text-blue-400' : 'text-gray-400'}`}
-                                                            title="Delete Action"
+                                                            title="アクションを削除"
                                                         >
                                                             <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -249,7 +249,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
                                                     </svg>
-                                                    + Line
+                                                    + 線を描く
                                                 </button>
                                                 <button
                                                      onClick={(e) => {
@@ -263,7 +263,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
                                                     </svg>
-                                                    + Tap
+                                                    + タップ
                                                 </button>
                                             </div>
                                         </div>

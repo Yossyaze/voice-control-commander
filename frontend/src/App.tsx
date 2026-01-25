@@ -336,7 +336,7 @@ function App() {
     // Create new command with one stroke
     const newCommand: Command = {
       id: newId,
-      name: "New Command",
+      name: "新規コマンド",
       points: initialPoints, // Legacy support, keeps sync with first stroke
       strokes: [initialPoints],
       isVisible: true,
@@ -380,7 +380,7 @@ function App() {
 
     } catch (error) {
       console.error('Error parsing file:', error);
-      alert(`Failed to parse file: ${file.name}`);
+      alert(`ファイルの解析に失敗しました: ${file.name}`);
     }
   };
 
@@ -762,7 +762,7 @@ function App() {
       }
     } catch (error: any) {
       console.error('Export Error:', error);
-      alert(`Export Failed: ${error.message}`);
+      alert(`エクスポートに失敗しました: ${error.message}`);
     }
   };
 
@@ -999,7 +999,7 @@ function App() {
                 <div 
                     className="absolute left-0 top-0 bottom-0 w-4 z-40 hover:bg-blue-500/10 transition-colors cursor-pointer flex items-center justify-start group"
                     onClick={() => setIsLeftSidebarOpen(true)}
-                    title="Open Sidebar"
+                    title="サイドバーを開く"
                 >
                     <div className="h-12 w-1 bg-blue-500/50 rounded-r opacity-0 group-hover:opacity-100 transition-opacity ml-0.5" />
                 </div>
@@ -1007,7 +1007,7 @@ function App() {
                 <div 
                     className="absolute right-0 top-0 bottom-0 w-4 z-40 hover:bg-blue-500/10 transition-colors cursor-pointer flex items-center justify-end group"
                     onClick={() => setIsRightSidebarOpen(true)}
-                    title="Open Settings"
+                    title="設定を開く"
                 >
                     <div className="h-12 w-1 bg-blue-500/50 rounded-l opacity-0 group-hover:opacity-100 transition-opacity mr-0.5" />
                 </div>
@@ -1040,7 +1040,7 @@ function App() {
             </button>
             <div className="h-4 w-px bg-gray-300 mx-2" />
             <button onClick={handleExport} className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 shadow-sm transition-colors">
-              Export
+              書き出し
             </button>
           </div>
         </div>
@@ -1104,13 +1104,13 @@ function App() {
                 ) : (
                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-0.5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" /></svg>
                 )}
-                <span className="font-medium text-sm">{isPlaying ? 'Stop' : 'Play'}</span>
+                <span className="font-medium text-sm">{isPlaying ? '停止' : '再生'}</span>
              </button>
              {/* Quick Fullscreen Toggle for center access */}
              <button 
                 onClick={handleToggleFullscreen}
                 className="p-2.5 bg-white/90 text-gray-600 rounded-full shadow-lg backdrop-blur-md border border-white/20 hover:bg-white transition-all transform hover:scale-105 active:scale-95"
-                title="Toggle Fullscreen"
+                title="全画面切替"
              >
                  {isFullscreen ? (
                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
