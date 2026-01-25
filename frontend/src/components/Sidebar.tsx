@@ -14,6 +14,8 @@ interface SidebarProps {
     onUpdateCommand: (cmd: Command) => void;
     selectedStrokeIndex: number | null;
     onSelectStroke: (index: number | null) => void;
+    selectionType?: 'stroke' | 'wait';
+    onSelectType?: (type: 'stroke' | 'wait') => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -27,7 +29,9 @@ const Sidebar: React.FC<SidebarProps> = ({
     onRenameCommand,
     onUpdateCommand,
     selectedStrokeIndex,
-    onSelectStroke
+    onSelectStroke,
+    selectionType = 'stroke',
+    onSelectType
 }) => {
     const [editingId, setEditingId] = React.useState<string | null>(null);
     const [editingName, setEditingName] = React.useState('');
@@ -107,6 +111,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                                         onClick={() => {
                                             onSelectCommand(cmd.id);
                                             onSelectStroke(null); // Select the whole command context
+                                            onSelectType?.('stroke');
                                         }}
                                     >
                                         <div className="flex items-center flex-1 min-w-0">
@@ -169,22 +174,23 @@ const Sidebar: React.FC<SidebarProps> = ({
                                                     {index > 0 && (
                                                         <div className="flex items-center justify-center py-1 group/gap">
                                                             <div 
-                                                                className={`h-6 w-1 rounded transition-colors cursor-pointer relative flex items-center justify-center
-                                                                    ${selectedStrokeIndex === index - 1 
-                                                                        ? 'bg-blue-500 ring-2 ring-blue-300 scale-x-125' 
-                                                                        : 'bg-gray-300 hover:bg-blue-400'}`}
+                                                                className={`h-6 w-2 rounded transition-colors cursor-pointer relative flex items-center justify-center
+                                                                    ${selectedStrokeIndex === index - 1 && selectionType === 'wait'
+                                                                        ? 'bg-blue-500 ring-2 ring-blue-300 scale-110' 
+                                                                        : 'bg-gray-200 hover:bg-blue-300'}`}
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     onSelectStroke(index - 1);
+                                                                    onSelectType?.('wait');
                                                                 }}
                                                                 title={`Wait time after Action ${index}`}
                                                             >
-                                                                {/* Helper hit area */}
-                                                                <div className="absolute -inset-x-4 inset-y-0" />
+                                                                {/* Helper hit area - Increased padding */}
+                                                                <div className="absolute -inset-x-6 inset-y-0 z-10" />
                                                                 
-                                                                {/* Time Label (Visible on Hover or Selected) */}
-                                                                <div className={`absolute left-4 top-1/2 transform -translate-y-1/2 text-[10px] font-medium bg-white border rounded px-1 shadow-sm whitespace-nowrap z-10 pointer-events-none
-                                                                    ${selectedStrokeIndex === index - 1 ? 'border-blue-500 text-blue-600 block' : 'border-gray-200 text-gray-600 hidden group-hover/gap:block'}`}>
+                                                                {/* Time Label (Always Visible) */}
+                                                                <div className={`absolute left-5 top-1/2 transform -translate-y-1/2 text-[10px] font-medium bg-white border rounded px-1 shadow-sm whitespace-nowrap z-20 pointer-events-none transition-colors
+                                                                    ${selectedStrokeIndex === index - 1 && selectionType === 'wait' ? 'border-blue-500 text-blue-600' : 'border-gray-200 text-gray-500'}`}>
                                                                     {(cmd.strokeMetadata?.[index - 1]?.waitAfter ?? cmd.waitDuration ?? 0.2)}s
                                                                 </div>
                                                             </div>
@@ -193,10 +199,11 @@ const Sidebar: React.FC<SidebarProps> = ({
 
                                                     {/* Action Item */}
                                                     <div
-                                                        className={`flex items-center justify-between text-xs border rounded p-1.5 shadow-sm group cursor-pointer transition-colors ${selectedStrokeIndex === index ? 'bg-blue-100 border-blue-400 ring-1 ring-blue-300' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
+                                                        className={`flex items-center justify-between text-xs border rounded p-1.5 shadow-sm group cursor-pointer transition-colors ${selectedStrokeIndex === index && selectionType === 'stroke' ? 'bg-blue-100 border-blue-400 ring-1 ring-blue-300' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             onSelectStroke(index);
+                                                            onSelectType?.('stroke');
                                                         }}
                                                     >
                                                         <div className="flex items-center">

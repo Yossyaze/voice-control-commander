@@ -125,6 +125,7 @@ function App() {
 
   const [selectedCommandId, setSelectedCommandId] = useState<string | null>(null);
   const [selectedStrokeIndex, setSelectedStrokeIndex] = useState<number | null>(null);
+  const [selectionType, setSelectionType] = useState<'stroke' | 'wait'>('stroke');
   
   // Refactored Device State
   const [selectedModelId, setSelectedModelId] = useState<string>('iphone_16_pro'); // Default to iPhone 16 Pro
@@ -135,7 +136,7 @@ function App() {
   const [showGrid, setShowGrid] = useState<boolean>(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
-  // const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
   // Remove unused state
   // const [showSettingsPopup, setShowSettingsPopup] = useState<boolean>(false);
@@ -152,14 +153,14 @@ function App() {
     return commands.find(c => c.id === selectedCommandId);
   }, [commands, selectedCommandId]);
 
-  // useEffect(() => {
-  //   const handleFullscreenChange = () => {
-  //     // setIsFullscreen(!!document.fullscreenElement);
-  //   };
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
 
-  //   document.addEventListener('fullscreenchange', handleFullscreenChange);
-  //   return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  // }, []);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
 
   // Animation Loop
   useEffect(() => {
@@ -346,6 +347,7 @@ function App() {
     setCommands(prev => [...prev, newCommand]);
     setSelectedCommandId(newId);
     setSelectedStrokeIndex(0); // Select the first stroke by default for immediate editing
+    setSelectionType('stroke');
     setDuration(0.4);
   };
 
@@ -372,6 +374,7 @@ function App() {
       if (newCommands.length > 0) {
         setSelectedCommandId(newCommands[0].id);
         setSelectedStrokeIndex(null); // Default to whole command selection
+        setSelectionType('stroke');
       }
 
     } catch (error) {
@@ -678,10 +681,15 @@ function App() {
     if (!selectedCommand) return;
 
     // Use the backend export_merged API to handle multi-stroke export correctly for single command
+    const strokeWaits = selectedCommand.strokes.map((_, i) => 
+      selectedCommand.strokeMetadata?.[i]?.waitAfter ?? selectedCommand.waitDuration ?? 0.2
+    );
+
     const commandToExport = {
       name: selectedCommand.name,
       points: [], // Not used if strokes is present
-      strokes: selectedCommand.strokes
+      strokes: selectedCommand.strokes,
+      stroke_waits: strokeWaits
     };
 
     try {
@@ -833,8 +841,19 @@ function App() {
   };
 
   const handleClearBackgroundImage = () => setBackgroundImage(null);
-  const handleEnterFullscreen = () => appRef.current?.requestFullscreen();
-  // const handleExitFullscreen = () => document.exitFullscreen();
+  const handleToggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+        // Auto-close sidebar when entering fullscreen for better initial view
+        setIsSidebarOpen(false);
+        appRef.current?.requestFullscreen().catch(err => {
+            console.error(`Error attempting to enable fullscreen: ${err.message}`);
+        });
+    } else {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        }
+    }
+  }, []);
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -908,7 +927,7 @@ function App() {
 
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden" ref={appRef}>
-      <div className={`${isSidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300 ease-in-out overflow-hidden flex-shrink-0`}>
+      <div className={`${isSidebarOpen ? 'w-64' : 'w-0'} ${isFullscreen ? 'absolute z-50 h-full shadow-2xl border-r border-gray-200' : ''} transition-all duration-300 ease-in-out overflow-hidden flex-shrink-0 bg-white`}>
         <Sidebar
           commands={commands}
           selectedCommandId={selectedCommandId}
@@ -921,6 +940,8 @@ function App() {
           onUpdateCommand={(updatedCmd) => setCommands(prev => prev.map(c => c.id === updatedCmd.id ? updatedCmd : c))}
           selectedStrokeIndex={selectedStrokeIndex}
           onSelectStroke={setSelectedStrokeIndex}
+          selectionType={selectionType}
+          onSelectType={setSelectionType}
         />
       </div>
 
@@ -966,8 +987,15 @@ function App() {
                 setSelectedCommandId(cmdId);
                 setSelectedStrokeIndex(strokeIndex);
               }}
-              connections={canvasConnections}
-            onSelectWait={setSelectedStrokeIndex}
+              connections={canvasConnections.map(c => ({
+                  ...c,
+                  // We can pass isSelected here if we want highlighting in canvas
+                  isSelected: selectionType === 'wait' && selectedStrokeIndex === c.strokeIndex
+              }))}
+            onSelectWait={(index) => {
+                setSelectedStrokeIndex(index);
+                setSelectionType('wait');
+            }}
             markerPosition={markerPosition}
               scale={scale}
             />
@@ -998,7 +1026,8 @@ function App() {
             onClearBackgroundImage={handleClearBackgroundImage}
             showGrid={showGrid}
             onToggleGrid={() => setShowGrid(!showGrid)}
-            onEnterFullscreen={handleEnterFullscreen}
+            onEnterFullscreen={handleToggleFullscreen}
+            isFullscreen={isFullscreen}
             duration={duration}
             onDurationChange={(newDur) => {
               if (selectedStrokeIndex !== null) {
@@ -1028,6 +1057,7 @@ function App() {
             onWaitDurationChange={handleWaitDurationChange}
             selectedStrokeWait={currentStrokeWait}
             onSelectedStrokeWaitChange={handleSelectedStrokeWaitChange}
+            selectionType={selectionType}
           />
         </div>
       </div>

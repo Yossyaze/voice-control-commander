@@ -23,6 +23,7 @@ interface ControlPanelProps {
     showGrid: boolean;
     onToggleGrid: (show: boolean) => void;
     onEnterFullscreen: () => void;
+    isFullscreen?: boolean;
     duration: number;
     onDurationChange: (duration: number) => void;
     isPlaying: boolean;
@@ -41,6 +42,7 @@ interface ControlPanelProps {
     onScaleChange: (scale: number) => void;
     selectedStrokeWait?: number;
     onSelectedStrokeWaitChange?: (duration: number) => void;
+    selectionType?: 'stroke' | 'wait';
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = ({
@@ -56,6 +58,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     showGrid,
     onToggleGrid,
     onEnterFullscreen,
+    isFullscreen = false,
     duration,
     onDurationChange,
     isPlaying,
@@ -73,7 +76,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     scale = 1.0,
     onScaleChange,
     selectedStrokeWait,
-    onSelectedStrokeWaitChange
+    onSelectedStrokeWaitChange,
+    selectionType = 'stroke'
 }) => {
     // Refs for long press
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -190,10 +194,21 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                             onClick={onEnterFullscreen}
                             className="px-2 py-1 text-xs text-blue-600 hover:text-blue-800 underline ml-auto flex items-center"
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                            </svg>
-                            全画面
+                            {isFullscreen ? (
+                                <>
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                    解除
+                                </>
+                            ) : (
+                                <>
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                                    </svg>
+                                    全画面
+                                </>
+                            )}
                         </button>
                     </div>
                 </div>
@@ -243,12 +258,21 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
             {/* Scrollable Middle Section: Properties (Conditional) */}
             <div className="flex-1 overflow-y-auto p-4">
-                {/* Time, Angle, Length (Single Action Only) */}
-                {isActionSelected ? (
-                    <>
-                        {/* Compact Property Block */}
-                        <div className="space-y-4">
-                            <div>
+                
+                {/* Action Properties - Hide if selectionType is 'wait' */}
+                {selectionType === 'stroke' && (
+                <div className="space-y-4 border-b border-gray-200 pb-4">
+                    <div className="flex items-center space-x-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Action Properties</span>
+                    </div>
+
+                    {isActionSelected ? (
+                        <>
+                            {/* Duration / Time */}
+                            <div className="space-y-1">
                                 <div className="flex justify-between items-center mb-1">
                                     <label className="text-xs font-medium text-gray-600">時間 (s)</label>
                                     <input
@@ -268,7 +292,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                     step="0.1"
                                     value={duration}
                                     onChange={(e) => onDurationChange(Number(e.target.value))}
-                                    className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                                    className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                                 />
                                 <div className="flex justify-end space-x-1 mt-1">
                                     <button
@@ -286,132 +310,163 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                 </div>
                             </div>
 
-                            <div>
-                                <div className="flex justify-between items-center mb-1">
-                                    <label className="text-xs font-medium text-gray-600">角度</label>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        max="1023"
-                                        step="1"
-                                        value={Math.round(angle)}
-                                        onChange={(e) => onAngleChange(Number(e.target.value))}
-                                        className="w-16 px-1 py-0.5 text-right border border-gray-300 rounded text-xs"
-                                    />
+                            {/* Angle */}
+                            <div className="space-y-1">
+                                <div className="flex justify-between text-xs text-gray-600">
+                                    <span>Angle</span>
+                                    <span>{Math.round(angle / 1024 * 360)}°</span>
                                 </div>
                                 <input
                                     type="range"
                                     min="0"
-                                    max="1023"
-                                    step="1"
+                                    max="1024"
                                     value={angle}
                                     onChange={(e) => onAngleChange(Number(e.target.value))}
-                                    className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                                    className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                                 />
-                                {/* Cardinal Direction Buttons */}
-                                <div className="flex justify-center space-x-2 mt-2">
-                                    <button
-                                        onClick={() => onAngleChange(256)}
-                                        className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded border border-gray-300 shadow-sm text-gray-600"
-                                        title="Up (sets Down 90°)"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                                        </svg>
-                                    </button>
-                                    <button
-                                        onClick={() => onAngleChange(768)}
-                                        className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded border border-gray-300 shadow-sm text-gray-600"
-                                        title="Down (sets Up 270°)"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                                        </svg>
-                                    </button>
-                                    <button
-                                        onClick={() => onAngleChange(0)}
-                                        className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded border border-gray-300 shadow-sm text-gray-600"
-                                        title="Left (sets Right 0°)"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                                        </svg>
-                                    </button>
-                                    <button
-                                        onClick={() => onAngleChange(512)}
-                                        className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded border border-gray-300 shadow-sm text-gray-600"
-                                        title="Right (sets Left 180°)"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                                        </svg>
-                                    </button>
-                                </div>
                             </div>
 
-                            <div>
-                                <div className="flex justify-between items-center mb-1">
-                                    <label className="text-xs font-medium text-gray-600">長さ (px)</label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        max="1000"
-                                        step="1"
-                                        value={Math.round(length)}
-                                        onChange={(e) => onLengthChange(Number(e.target.value))}
-                                        className="w-16 px-1 py-0.5 text-right border border-gray-300 rounded text-xs"
-                                    />
+                             {/* Cardinal Direction Buttons (Added back) */}
+                            <div className="flex justify-center space-x-2 mt-2">
+                                <button
+                                    onClick={() => onAngleChange(256)}
+                                    className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded border border-gray-300 shadow-sm text-gray-600"
+                                    title="Up (sets Down 90°)"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                                    </svg>
+                                </button>
+                                <button
+                                    onClick={() => onAngleChange(768)}
+                                    className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded border border-gray-300 shadow-sm text-gray-600"
+                                    title="Down (sets Up 270°)"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                                    </svg>
+                                </button>
+                                <button
+                                    onClick={() => onAngleChange(0)}
+                                    className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded border border-gray-300 shadow-sm text-gray-600"
+                                    title="Left (sets Right 0°)"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                                    </svg>
+                                </button>
+                                <button
+                                    onClick={() => onAngleChange(512)}
+                                    className="w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded border border-gray-300 shadow-sm text-gray-600"
+                                    title="Right (sets Left 180°)"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                    </svg>
+                                </button>
+                            </div>
+
+                            {/* Length */}
+                            <div className="space-y-1">
+                                <div className="flex justify-between text-xs text-gray-600">
+                                    <span>Length</span>
+                                    <span>{Math.round(length)}px</span>
                                 </div>
                                 <input
                                     type="range"
                                     min="10"
-                                    max="1000"
-                                    step="10"
+                                    max="800"
                                     value={length}
                                     onChange={(e) => onLengthChange(Number(e.target.value))}
-                                    className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                                    className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                                 />
                             </div>
 
-                            
-                            {/* Individual Wait Time */}
-                            <div>
-                                <div className="flex justify-between items-center mb-1">
-                                    <label className="text-xs font-medium text-gray-600">待機時間 (s)</label>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        max="5.0"
-                                        step="0.1"
-                                        value={selectedStrokeWait !== undefined ? selectedStrokeWait : waitDuration}
-                                        onChange={(e) => onSelectedStrokeWaitChange && onSelectedStrokeWaitChange(Number(e.target.value))}
-                                        className="w-16 px-1 py-0.5 text-right border border-gray-300 rounded text-xs"
-                                    />
+                            {/* Curve */}
+                            <div className="pt-2">
+                                <button
+                                    onClick={onCurve}
+                                    className="w-full py-1.5 px-3 bg-white border border-gray-300 rounded text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center justify-center transition-colors"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+                                    </svg>
+                                    Add Curve / Randomize
+                                </button>
+                            </div>
+
+                            {/* Nudge Controls */}
+                            <div className="pt-2 space-y-2">
+                                <div className="flex justify-between items-center mb-2">
+                                    <h3 className="text-xs font-medium text-gray-500">
+                                        {isActionSelected ? '座標調整' : '一括座標調整'}
+                                    </h3>
+                                    <div className="text-[10px] font-mono text-gray-400">
+                                        {absoluteX !== undefined ? Math.round(absoluteX) : '--'}, {absoluteY !== undefined ? Math.round(absoluteY) : '--'}
+                                    </div>
                                 </div>
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max="2.0"
-                                    step="0.1"
-                                    value={selectedStrokeWait !== undefined ? selectedStrokeWait : waitDuration}
-                                    onChange={(e) => onSelectedStrokeWaitChange && onSelectedStrokeWaitChange(Number(e.target.value))}
-                                    className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                                />
-                                <div className="text-[10px] text-gray-400 text-right mt-1">
-                                    {selectedStrokeWait !== undefined ? '個別設定中' : '全体設定を使用'}
+
+                                <div className="grid grid-cols-2 gap-2">
+                                    {/* X Axis */}
+                                    <div className="flex items-center space-x-1">
+                                        <span className="text-[10px] text-gray-400 font-mono">X</span>
+                                        <button
+                                            onMouseDown={() => startAdjusting(-1, 0)}
+                                            onMouseUp={stopAdjusting}
+                                            onMouseLeave={stopAdjusting}
+                                            className="flex-1 bg-gray-100 hover:bg-gray-200 rounded px-2 py-1 text-xs text-gray-600 font-mono active:bg-gray-300"
+                                        >-</button>
+                                        <button
+                                            onMouseDown={() => startAdjusting(1, 0)}
+                                            onMouseUp={stopAdjusting}
+                                            onMouseLeave={stopAdjusting}
+                                            className="flex-1 bg-gray-100 hover:bg-gray-200 rounded px-2 py-1 text-xs text-gray-600 font-mono active:bg-gray-300"
+                                        >+</button>
+                                    </div>
+                                    {/* Y Axis */}
+                                    <div className="flex items-center space-x-1">
+                                        <span className="text-[10px] text-gray-400 font-mono">Y</span>
+                                        <button
+                                            onMouseDown={() => startAdjusting(0, -1)}
+                                            onMouseUp={stopAdjusting}
+                                            onMouseLeave={stopAdjusting}
+                                            className="flex-1 bg-gray-100 hover:bg-gray-200 rounded px-2 py-1 text-xs text-gray-600 font-mono active:bg-gray-300"
+                                        >-</button>
+                                        <button
+                                            onMouseDown={() => startAdjusting(0, 1)}
+                                            onMouseUp={stopAdjusting}
+                                            onMouseLeave={stopAdjusting}
+                                            className="flex-1 bg-gray-100 hover:bg-gray-200 rounded px-2 py-1 text-xs text-gray-600 font-mono active:bg-gray-300"
+                                        >+</button>
+                                    </div>
+                                </div>
+                                <div className="text-[10px] text-gray-400 text-center pt-1">
+                                    Long press to repeat
                                 </div>
                             </div>
+                        </>
+                    ) : (
+                        <div className="text-xs text-gray-400 italic text-center py-4">
+                            Select an action on canvas or sidebar to edit properties
                         </div>
-                    </>
-                ) : (
-                    <div className="space-y-4">
-                        <div className="p-3 bg-blue-50 border border-blue-100 rounded text-xs text-blue-800">
-                            <p className="font-semibold">コマンド全体編集中</p>
-                            <p className="mt-1 opacity-75">操作は全てのアクションに適用されます。</p>
-                        </div>
+                    )}
+                </div>
+                )}
 
-                        {/* Wait Time Control */}
-                        <div>
+                {/* Wait Duration Information */}
+                {(selectionType === 'wait' || (selectionType === 'stroke' && !isActionSelected)) && (
+                <div className="space-y-4 border-b border-gray-200 pb-4">
+                    <div className="flex items-center space-x-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Wait Duration</span>
+                    </div>
+
+                    <div className="space-y-1">
+                         {/* Global/Default */}
+                        {selectionType === 'stroke' && !isActionSelected && (
+                        <>
                             <div className="flex justify-between items-center mb-1">
                                 <label className="text-xs font-medium text-gray-600">一括待機時間 (s)</label>
                                 <input
@@ -433,7 +488,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                 onChange={(e) => onWaitDurationChange && onWaitDurationChange(Number(e.target.value))}
                                 className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                             />
-                            <div className="flex justify-end space-x-1 mt-1">
+                             <div className="flex justify-end space-x-1 mt-1">
                                 <button
                                     onClick={() => onWaitDurationChange && onWaitDurationChange(0.2)}
                                     className="px-2 py-1 text-[10px] bg-gray-100 hover:bg-gray-200 rounded text-gray-600 border border-gray-200"
@@ -447,80 +502,35 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                     長め (0.5s)
                                 </button>
                             </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Common Operations */}
-                <div className="mt-4 space-y-4">
-                    <button
-                        onClick={onCurve}
-                        className="w-full px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded border border-purple-200 text-xs font-medium transition-colors flex items-center justify-center"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                        </svg>
-                        {isActionSelected ? '曲げる (Curve)' : '一括ランダムカーブ'}
-                    </button>
-
-                    {/* Compact Nudge */}
-                    <div>
-                        <div className="flex justify-between items-center mb-2">
-                            <h3 className="text-xs font-medium text-gray-500">
-                                {isActionSelected ? '座標調整' : '一括座標調整'}
-                            </h3>
-                            <div className="text-[10px] font-mono text-gray-400">
-                                {absoluteX !== undefined ? Math.round(absoluteX) : '--'}, {absoluteY !== undefined ? Math.round(absoluteY) : '--'}
-                            </div>
-                        </div>
-
-                        <div className="bg-gray-50 p-2 rounded border border-gray-100 flex justify-center">
-                            <div className="grid grid-cols-3 gap-1">
-                                <div></div>
-                                <button
-                                    onMouseDown={() => startAdjusting(0, -1)}
-                                    onMouseUp={stopAdjusting}
-                                    onMouseLeave={stopAdjusting}
-                                    className="w-8 h-8 flex items-center justify-center bg-white border border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 shadow-sm"
-                                >
-                                    <svg className="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
-                                </button>
-                                <div></div>
-
-                                <button
-                                    onMouseDown={() => startAdjusting(-1, 0)}
-                                    onMouseUp={stopAdjusting}
-                                    onMouseLeave={stopAdjusting}
-                                    className="w-8 h-8 flex items-center justify-center bg-white border border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 shadow-sm"
-                                >
-                                    <svg className="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-                                </button>
-                                <div className="w-8 h-8 flex items-center justify-center">
-                                    <span className="w-1.5 h-1.5 bg-gray-300 rounded-full"></span>
+                        </>
+                        )}
+                        
+                         {/* Individual Override (Only when 'wait' selected) */}
+                        {selectionType === 'wait' && (
+                             <div className="p-2 bg-blue-50 rounded border border-blue-100 mt-2">
+                                <div className="flex justify-between text-xs text-gray-600 mb-1">
+                                    <span className={selectedStrokeWait !== undefined ? "text-blue-700 font-medium" : "text-gray-500"}>
+                                        {selectedStrokeWait !== undefined ? "個別設定 (Override)" : "全体設定を使用"}
+                                    </span>
+                                    <span className="text-blue-700 font-medium">
+                                        {selectedStrokeWait !== undefined ? selectedStrokeWait : (waitDuration || 0.2)}s
+                                    </span>
                                 </div>
-                                <button
-                                    onMouseDown={() => startAdjusting(1, 0)}
-                                    onMouseUp={stopAdjusting}
-                                    onMouseLeave={stopAdjusting}
-                                    className="w-8 h-8 flex items-center justify-center bg-white border border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 shadow-sm"
-                                >
-                                    <svg className="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                                </button>
-
-                                <div></div>
-                                <button
-                                    onMouseDown={() => startAdjusting(0, 1)}
-                                    onMouseUp={stopAdjusting}
-                                    onMouseLeave={stopAdjusting}
-                                    className="w-8 h-8 flex items-center justify-center bg-white border border-gray-300 rounded hover:bg-gray-100 active:bg-gray-200 shadow-sm"
-                                >
-                                    <svg className="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                                </button>
-                                <div></div>
+                                <input
+                                    type="range"
+                                    min="0.0"
+                                    max="5.0"
+                                    step="0.05"
+                                    value={selectedStrokeWait !== undefined ? selectedStrokeWait : (waitDuration || 0.2)}
+                                    onChange={(e) => onSelectedStrokeWaitChange?.(Number(e.target.value))}
+                                    className="w-full h-1 bg-blue-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                />
+                                <p className="text-[10px] text-blue-400 mt-1">このアクション直後の待機時間</p>
                             </div>
-                        </div>
+                        )}
                     </div>
                 </div>
+                )}
             </div>
 
             {/* Bottom Static Section: Playback & Export - Compacted */}

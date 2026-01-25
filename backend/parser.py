@@ -326,7 +326,7 @@ class NSKeyedArchiverWriter:
         return plistlib.dumps(final_plist, fmt=plistlib.FMT_BINARY)
 
 
-def create_gesture_data(strokes: list):
+def create_gesture_data(strokes: list, waits: list = None):
     """
     ストロークデータから CustomGesture バイナリを生成。
     動作するファイルの構造を完全に模倣。
@@ -350,7 +350,16 @@ def create_gesture_data(strokes: list):
     
     for stroke_index, stroke in enumerate(strokes):
         if stroke_index > 0:
-            current_time += 0.2
+            # Determine wait time from previous stroke
+            # waits[i] corresponds to wait AFTER stroke i. So we want wait after stroke_index - 1
+            wait_time = 0.2 # Default
+            if waits and (stroke_index - 1) < len(waits):
+                 wait_time = waits[stroke_index - 1]
+            
+            # Ensure minimum wait of 0.1s ensures distinct strokes? Or just trust user?
+            # Voice Control tends to merge strokes if they are too close.
+            # But here we are inserting a "Gap" in time.
+            current_time += wait_time
             # リフトイベント（空の Fingers/Forces）
             empty_dict_uid = archiver.archive_mutable_dict([], [])
             time_uid = archiver._add_object(current_time)
@@ -435,7 +444,8 @@ def create_combined_plist(commands_data: list):
         else:
             strokes_to_use = [] # No points/strokes provided
 
-        gesture_data = create_gesture_data(strokes_to_use)
+        waits = cmd.get('stroke_waits', [])
+        gesture_data = create_gesture_data(strokes_to_use, waits)
         
         commands_table[cmd_id] = {
             'CommandID': cmd_id,

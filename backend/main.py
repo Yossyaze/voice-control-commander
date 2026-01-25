@@ -72,6 +72,7 @@ class CommandData(BaseModel):
     name: str
     points: List[Point] = []
     strokes: List[List[Point]] = None
+    stroke_waits: List[float] = None # List of wait times. index i is wait AFTER stroke i.
     duration: float = None
 
 class ExportMergedRequest(BaseModel):
@@ -89,6 +90,8 @@ async def export_merged(request: ExportMergedRequest):
             }
             if cmd.strokes:
                 cmd_dict['strokes'] = [[{'x': p.x, 'y': p.y} for p in stroke] for stroke in cmd.strokes]
+            if cmd.stroke_waits:
+                cmd_dict['stroke_waits'] = cmd.stroke_waits
             commands_list.append(cmd_dict)
             
         plist_bytes = create_combined_plist(commands_list)
