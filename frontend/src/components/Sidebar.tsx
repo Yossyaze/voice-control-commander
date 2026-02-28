@@ -19,7 +19,7 @@ import type { Command, Point } from "../api";
 
 interface SidebarProps {
   commands: Command[];
-  selectedCommandId: string | null;
+  activeCommandId: string | null;
   onSelectCommand: (id: string) => void;
   onDeleteCommand: (id: string) => void;
   onToggleVisibility: (id: string) => void;
@@ -39,10 +39,12 @@ interface SidebarProps {
   ) => void;
 
   // Multi-selection
-  selectedCommandIds: Set<string>;
+  checkedCommandIds: Set<string>;
   onToggleSelectCommand: (id: string, multi: boolean) => void;
   onBatchExport: () => void;
   onBatchDelete: () => void;
+  onSelectAll: () => void;
+  onClearSelection: () => void;
 }
 
 // ----------------------------------------------------------------------------
@@ -598,7 +600,7 @@ const SortableCommandItem = ({
 const Sidebar: React.FC<SidebarProps> = (props) => {
   const {
     commands,
-    selectedCommandId,
+    activeCommandId,
     onSelectCommand,
     onDeleteCommand,
     onToggleVisibility,
@@ -612,10 +614,12 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
     onSelectType,
     onReorderCommands,
     onReorderStrokes,
-    selectedCommandIds,
+    checkedCommandIds,
     onToggleSelectCommand,
     onBatchExport,
     onBatchDelete,
+    onSelectAll,
+    onClearSelection,
   } = props;
 
   const [editingId, setEditingId] = React.useState<string | null>(null);
@@ -712,32 +716,69 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
           </button>
         </div>
       </div>
-
       {/* Batch Actions Toolbar */}
-      {selectedCommandIds.size > 0 && (
-        <div className="bg-blue-50 px-3 py-2 border-b border-blue-100 flex items-center justify-between animate-in slide-in-from-top-2 duration-200">
-          <span className="text-xs font-semibold text-blue-800">
-            {selectedCommandIds.size} 件選択中
-          </span>
-          <div className="flex space-x-2">
-            <button
-              onClick={onBatchDelete}
-              className="p-1 px-2 bg-white border border-red-200 text-red-600 rounded text-xs hover:bg-red-50 transition-colors shadow-sm"
-              title="選択した項目を削除"
-            >
-              削除
-            </button>
-            <button
-              onClick={onBatchExport}
-              className="p-1 px-2 bg-white border border-blue-200 text-blue-600 rounded text-xs hover:bg-blue-100 transition-colors shadow-sm"
-              title="選択した項目を書き出し"
-            >
-              書き出し
-            </button>
-          </div>
-        </div>
-      )}
+      {(() => {
+        const isAllSelected =
+          commands.length > 0 && checkedCommandIds.size === commands.length;
+        return (
+          <div
+            className={`px-3 py-2 border-b flex flex-col space-y-2 transition-colors duration-200 ${
+              checkedCommandIds.size > 0
+                ? "bg-blue-50 border-blue-100"
+                : "bg-gray-50 border-gray-200"
+            }`}
+          >
+            {/* 1行目: 選択状況と全選択ボタン */}
+            <div className="flex items-center justify-between w-full">
+              <span
+                className={`text-xs font-semibold ${checkedCommandIds.size > 0 ? "text-blue-800" : "text-gray-500"}`}
+              >
+                {checkedCommandIds.size} 件選択中
+              </span>
+              <div className="flex text-[10px] space-x-1">
+                <button
+                  onClick={isAllSelected ? onClearSelection : onSelectAll}
+                  className={`px-2 py-0.5 rounded transition-colors ${
+                    isAllSelected
+                      ? "text-gray-500 hover:text-gray-700 hover:bg-gray-200"
+                      : "text-blue-600 hover:text-blue-800 hover:bg-blue-100"
+                  }`}
+                >
+                  {isAllSelected ? "選択解除" : "全て選択"}
+                </button>
+              </div>
+            </div>
 
+            {/* 2行目: バッチアクションボタン */}
+            <div className="flex space-x-2 w-full">
+              <button
+                onClick={onBatchDelete}
+                disabled={checkedCommandIds.size === 0}
+                className={`flex-1 p-1.5 border rounded text-xs transition-colors shadow-sm ${
+                  checkedCommandIds.size > 0
+                    ? "bg-white border-red-200 text-red-600 hover:bg-red-50"
+                    : "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
+                }`}
+                title="選択した項目を削除"
+              >
+                削除
+              </button>
+              <button
+                onClick={onBatchExport}
+                disabled={checkedCommandIds.size === 0}
+                className={`flex-1 p-1.5 border rounded text-xs transition-colors shadow-sm ${
+                  checkedCommandIds.size > 0
+                    ? "bg-white border-blue-200 text-blue-600 hover:bg-blue-100"
+                    : "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
+                }`}
+                title="選択した項目を書き出し"
+              >
+                書き出し
+              </button>
+            </div>
+          </div>
+        );
+      })()}{" "}
       {/* Command List */}
       <div className="flex-1 overflow-y-auto bg-gray-50 p-2 space-y-2">
         {commands.length === 0 ? (
@@ -759,7 +800,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                   <SortableCommandItem
                     key={cmd.id}
                     command={cmd}
-                    isSelected={cmd.id === selectedCommandId}
+                    isSelected={cmd.id === activeCommandId}
                     editingId={editingId}
                     editingName={editingName}
                     setEditingName={setEditingName}
@@ -767,7 +808,9 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                     onFinishEditing={handleFinishEditing}
                     onSelect={() => {
                       onSelectCommand(cmd.id);
-                      onSelectStroke(null);
+                      onSelectStroke(
+                        cmd.strokes && cmd.strokes.length > 0 ? 0 : null,
+                      );
                       onSelectType?.("stroke");
                     }}
                     onToggleVisibility={() => onToggleVisibility(cmd.id)}
@@ -780,9 +823,8 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                     onReorderStrokes={(oldIndex, newIndex) =>
                       onReorderStrokes(cmd.id, oldIndex, newIndex)
                     }
-                    isMultiSelected={selectedCommandIds.has(cmd.id)}
-                    onToggleMultiSelect={(e) => {
-                      const isMulti = e.metaKey || e.ctrlKey || e.shiftKey; // Shift range select todo later, current basic toggle
+                    isMultiSelected={checkedCommandIds.has(cmd.id)}
+                    onToggleMultiSelect={() => {
                       onToggleSelectCommand(cmd.id, false); // Just toggle
                     }}
                   />

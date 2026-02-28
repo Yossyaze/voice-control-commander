@@ -455,10 +455,8 @@ function App() {
     return COMMAND_COLORS[currentCommands.length % COMMAND_COLORS.length];
   };
 
-  const [selectedCommandId, setSelectedCommandId] = useState<string | null>(
-    null,
-  );
-  const [selectedCommandIds, setSelectedCommandIds] = useState<Set<string>>(
+  const [activeCommandId, setActiveCommandId] = useState<string | null>(null);
+  const [checkedCommandIds, setCheckedCommandIds] = useState<Set<string>>(
     new Set(),
   );
   const [selectedStrokeIndex, setSelectedStrokeIndex] = useState<number | null>(
@@ -495,8 +493,8 @@ function App() {
   const startTimeRef = useRef<number | null>(null);
 
   const selectedCommand = useMemo(() => {
-    return commands.find((c) => c.id === selectedCommandId);
-  }, [commands, selectedCommandId]);
+    return commands.find((c) => c.id === activeCommandId);
+  }, [commands, activeCommandId]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -717,13 +715,13 @@ function App() {
     };
 
     setCommands((prev) => [...prev, newCommand]);
-    setSelectedCommandId(newId);
+    setActiveCommandId(newId);
     setSelectedStrokeIndex(0); // Select the first stroke by default for immediate editing
     setSelectionType("stroke");
     setDuration(0.4);
     setDuration(0.4);
     // Auto-select the new command in multi-select too? Or clear others?
-    setSelectedCommandIds(new Set([newId]));
+    setCheckedCommandIds(new Set([newId]));
   };
 
   const handleFileUpload = async (file: File) => {
@@ -756,8 +754,8 @@ function App() {
 
       setCommands((prev) => [...prev, ...newCommands]);
       if (newCommands.length > 0) {
-        setSelectedCommandId(newCommands[0].id);
-        setSelectedStrokeIndex(null); // Default to whole command selection
+        setActiveCommandId(newCommands[0].id);
+        setSelectedStrokeIndex(0); // Default to first stroke for immediate editing
         setSelectionType("stroke");
       }
     } catch (error) {
@@ -803,10 +801,10 @@ function App() {
   };
 
   const updateSelectedStroke = (newPoints: Point[]) => {
-    if (!selectedCommandId) return;
+    if (!activeCommandId) return;
     setCommands((prev) =>
       prev.map((cmd) => {
-        if (cmd.id !== selectedCommandId) return cmd;
+        if (cmd.id !== activeCommandId) return cmd;
         let newStrokes = [...cmd.strokes];
         if (selectedStrokeIndex !== null) {
           if (selectedStrokeIndex < newStrokes.length) {
@@ -870,10 +868,10 @@ function App() {
 
   const handleNudge = useCallback(
     (type: "x" | "y", delta: number) => {
-      if (!selectedCommandId) return;
+      if (!activeCommandId) return;
       setCommands((prev) =>
         prev.map((cmd) => {
-          if (cmd.id !== selectedCommandId) return cmd;
+          if (cmd.id !== activeCommandId) return cmd;
           let strokesToUpdate: number[] = [];
           if (selectedStrokeIndex !== null) {
             const idx = selectedStrokeIndex;
@@ -898,15 +896,15 @@ function App() {
         }),
       );
     },
-    [selectedCommandId, selectedStrokeIndex],
+    [activeCommandId, selectedStrokeIndex],
   );
 
   const handleCurve = () => {
-    if (!selectedCommandId) return;
+    if (!activeCommandId) return;
 
     setCommands((prev) =>
       prev.map((cmd) => {
-        if (cmd.id !== selectedCommandId) return cmd;
+        if (cmd.id !== activeCommandId) return cmd;
 
         // Determine usage:
         // If selectedStrokeIndex is set, curve only that one.
@@ -965,11 +963,11 @@ function App() {
   };
 
   const handleMakeStraight = () => {
-    if (!selectedCommandId) return;
+    if (!activeCommandId) return;
 
     setCommands((prev) =>
       prev.map((cmd) => {
-        if (cmd.id !== selectedCommandId) return cmd;
+        if (cmd.id !== activeCommandId) return cmd;
 
         const indicesToModify =
           selectedStrokeIndex !== null
@@ -1062,11 +1060,11 @@ function App() {
   }, [selectedCommand, selectedStrokeIndex]); // Add selectedStrokeIndex dependency
 
   const handleDeleteSelectedAction = useCallback(() => {
-    if (!selectedCommandId || selectedStrokeIndex === null) return;
+    if (!activeCommandId || selectedStrokeIndex === null) return;
 
     setCommands((prev) =>
       prev.map((cmd) => {
-        if (cmd.id !== selectedCommandId) return cmd;
+        if (cmd.id !== activeCommandId) return cmd;
         const newStrokes = [...cmd.strokes];
         if (selectedStrokeIndex < newStrokes.length) {
           newStrokes.splice(selectedStrokeIndex, 1);
@@ -1085,7 +1083,7 @@ function App() {
       // Let's stick to null (command selection) to be safe or index 0 if exists?
       // Let's just go null for now.
     }
-  }, [selectedCommandId, selectedStrokeIndex]);
+  }, [activeCommandId, selectedStrokeIndex]);
 
   // ==== 角度反転ハンドラー ====
   const handleFlipAngle = () => {
@@ -1125,7 +1123,7 @@ function App() {
     return commands
       .filter((c) => c.isVisible)
       .flatMap((cmd) => {
-        const isCommandSelected = cmd.id === selectedCommandId;
+        const isCommandSelected = cmd.id === activeCommandId;
 
         // Map each stroke
         return cmd.strokes.map((stroke, index) => {
@@ -1151,7 +1149,7 @@ function App() {
           };
         });
       });
-  }, [commands, selectedCommandId, selectedStrokeIndex]);
+  }, [commands, activeCommandId, selectedStrokeIndex]);
 
   const canvasConnections = useMemo(() => {
     if (!selectedCommand || selectedCommand.strokes.length < 2) return [];
@@ -1192,10 +1190,10 @@ function App() {
 
   const handleBatchExport = async () => {
     const targetIds =
-      selectedCommandIds.size > 0
-        ? Array.from(selectedCommandIds)
-        : selectedCommandId
-          ? [selectedCommandId]
+      checkedCommandIds.size > 0
+        ? Array.from(checkedCommandIds)
+        : activeCommandId
+          ? [activeCommandId]
           : [];
 
     if (targetIds.length === 0) return;
@@ -1281,23 +1279,23 @@ function App() {
   };
 
   const handleBatchDelete = () => {
-    if (selectedCommandIds.size === 0) return;
+    if (checkedCommandIds.size === 0) return;
 
-    if (!confirm(`${selectedCommandIds.size} 件のコマンドを削除しますか？`))
+    if (!confirm(`${checkedCommandIds.size} 件のコマンドを削除しますか？`))
       return;
 
-    setCommands((prev) => prev.filter((c) => !selectedCommandIds.has(c.id)));
+    setCommands((prev) => prev.filter((c) => !checkedCommandIds.has(c.id)));
 
     // Clear selection
-    setSelectedCommandIds(new Set());
-    if (selectedCommandId && selectedCommandIds.has(selectedCommandId)) {
-      setSelectedCommandId(null);
+    setCheckedCommandIds(new Set());
+    if (activeCommandId && checkedCommandIds.has(activeCommandId)) {
+      setActiveCommandId(null);
       setSelectedStrokeIndex(null);
     }
   };
 
   const handleToggleSelectCommand = (id: string, multi: boolean) => {
-    setSelectedCommandIds((prev) => {
+    setCheckedCommandIds((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(id)) {
         newSet.delete(id);
@@ -1310,6 +1308,14 @@ function App() {
     if (!multi) {
       // If simply toggling via checkbox, we don't necessarily change "active" editing command
     }
+  };
+
+  const handleSelectAllCommands = () => {
+    setCheckedCommandIds(new Set(commands.map((c) => c.id)));
+  };
+
+  const handleClearCommandSelection = () => {
+    setCheckedCommandIds(new Set());
   };
 
   // Handle pinch-to-zoom
@@ -1447,7 +1453,7 @@ function App() {
     // If we move item at index A to B. And we effectively selected index A.
     // If we keep selection index A, we are now selecting a different item.
     // Let's try to track the selection.
-    if (selectedCommandId === commandId && selectedStrokeIndex !== null) {
+    if (activeCommandId === commandId && selectedStrokeIndex !== null) {
       if (selectedStrokeIndex === oldIndex) {
         setSelectedStrokeIndex(newIndex);
       } else if (
@@ -1523,19 +1529,19 @@ function App() {
   }, [togglePlay, handleNudge]); // Dependencies ensure fresh closures
 
   const handleWaitDurationChange = (newDuration: number) => {
-    if (!selectedCommandId) return;
+    if (!activeCommandId) return;
     setCommands((prev) =>
       prev.map((c) =>
-        c.id === selectedCommandId ? { ...c, waitDuration: newDuration } : c,
+        c.id === activeCommandId ? { ...c, waitDuration: newDuration } : c,
       ),
     );
   };
 
   const handleSelectedStrokeWaitChange = (newDuration: number) => {
-    if (!selectedCommandId) return;
+    if (!activeCommandId) return;
     setCommands((prev) =>
       prev.map((c) => {
-        if (c.id !== selectedCommandId) return c;
+        if (c.id !== activeCommandId) return c;
 
         let newMetadata = c.strokeMetadata ? [...c.strokeMetadata] : [];
         // Ensure metadata exists for all strokes
@@ -1589,8 +1595,8 @@ function App() {
       >
         <Sidebar
           commands={commands}
-          selectedCommandId={selectedCommandId}
-          onSelectCommand={setSelectedCommandId}
+          activeCommandId={activeCommandId}
+          onSelectCommand={setActiveCommandId}
           onDeleteCommand={(id) =>
             setCommands((prev) => prev.filter((c) => c.id !== id))
           }
@@ -1619,10 +1625,12 @@ function App() {
           onSelectType={setSelectionType}
           onReorderCommands={handleReorderCommands}
           onReorderStrokes={handleReorderStrokes}
-          selectedCommandIds={selectedCommandIds}
+          checkedCommandIds={checkedCommandIds}
           onToggleSelectCommand={handleToggleSelectCommand}
           onBatchExport={handleBatchExport}
           onBatchDelete={handleBatchDelete}
+          onSelectAll={handleSelectAllCommands}
+          onClearSelection={handleClearCommandSelection}
         />
         {/* Close button for fullscreen popup mode */}
         {isFullscreen && isLeftSidebarOpen && (
@@ -1774,7 +1782,7 @@ function App() {
                     }
                   }
 
-                  setSelectedCommandId(cmdId);
+                  setActiveCommandId(cmdId);
                   setSelectedStrokeIndex(strokeIndex);
                   // Also open settings if closed?
                   if (!isRightSidebarOpen && !isFullscreen)
