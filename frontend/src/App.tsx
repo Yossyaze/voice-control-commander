@@ -1317,6 +1317,84 @@ function App() {
   const handleClearCommandSelection = () => {
     setCheckedCommandIds(new Set());
   };
+  const handleScaleChange = useCallback(
+    (
+      newScaleOrUpdater: number | ((prev: number) => number),
+      cursorX?: number,
+      cursorY?: number,
+    ) => {
+      setScale((prevScale) => {
+        let newScale: number;
+        if (typeof newScaleOrUpdater === "function") {
+          newScale = newScaleOrUpdater(prevScale);
+        } else {
+          newScale = newScaleOrUpdater;
+        }
+
+        newScale = Math.min(Math.max(newScale, 0.2), 10.0);
+
+        if (newScale !== prevScale && scrollContainerRef.current) {
+          const container = scrollContainerRef.current;
+          const canvasEl = container.querySelector("canvas");
+          if (canvasEl) {
+            const containerRect = container.getBoundingClientRect();
+            const canvasRect = canvasEl.getBoundingClientRect();
+
+            // ビューポート内の基準点（スクリーン座標）
+            let screenX = cursorX;
+            let screenY = cursorY;
+            if (screenX === undefined || screenY === undefined) {
+              screenX = containerRect.left + containerRect.width / 2;
+              screenY = containerRect.top + containerRect.height / 2;
+            }
+
+            // ビューポート内の基準点の位置（コンテナ相対）
+            const viewportX = screenX - containerRect.left;
+            const viewportY = screenY - containerRect.top;
+
+            // 基準点のキャンバス左端からの距離（CSSピクセル、旧スケール時）
+            const canvasContentLeft =
+              canvasRect.left - containerRect.left + container.scrollLeft;
+            const canvasContentTop =
+              canvasRect.top - containerRect.top + container.scrollTop;
+            const dxFromCanvas =
+              container.scrollLeft + viewportX - canvasContentLeft;
+            const dyFromCanvas =
+              container.scrollTop + viewportY - canvasContentTop;
+
+            const scaleRatio = newScale / prevScale;
+
+            // rAF内でReactのレンダリング後の実際のキャンバス位置を使って補正
+            window.requestAnimationFrame(() => {
+              if (!scrollContainerRef.current) return;
+              const c = scrollContainerRef.current;
+              const newCanvasRect = canvasEl.getBoundingClientRect();
+              const newContainerRect = c.getBoundingClientRect();
+
+              // レンダリング後のキャンバスのコンテンツ内位置
+              const newCanvasContentLeft =
+                newCanvasRect.left - newContainerRect.left + c.scrollLeft;
+              const newCanvasContentTop =
+                newCanvasRect.top - newContainerRect.top + c.scrollTop;
+
+              // 基準点のコンテンツ内新位置
+              const targetContentX =
+                newCanvasContentLeft + dxFromCanvas * scaleRatio;
+              const targetContentY =
+                newCanvasContentTop + dyFromCanvas * scaleRatio;
+
+              // 基準点がビューポート上の同じ位置に来るようスクロール
+              c.scrollLeft = targetContentX - viewportX;
+              c.scrollTop = targetContentY - viewportY;
+            });
+          }
+        }
+
+        return newScale;
+      });
+    },
+    [],
+  );
 
   // Handle pinch-to-zoom
   useEffect(() => {
@@ -1329,13 +1407,10 @@ function App() {
       if (e.ctrlKey) {
         e.preventDefault();
 
-        // Adjust scale sensitivity
+        // スケール感度の調整
         const delta = -e.deltaY * 0.01;
-
-        setScale((prevScale) => {
-          const newScale = Math.min(Math.max(prevScale + delta, 0.2), 3.0);
-          return newScale;
-        });
+        // カーソル座標を渡さず、ビューポート中心を基準にズームする
+        handleScaleChange((prev) => prev + delta);
       }
     };
 
@@ -1345,7 +1420,7 @@ function App() {
     return () => {
       container.removeEventListener("wheel", handleWheel);
     };
-  }, []); // Empty deps as we use setScale callback form
+  }, [handleScaleChange]);
 
   const handlePathDrag = (
     id: string,
@@ -1904,7 +1979,7 @@ function App() {
           orientation={orientation}
           onSelectOrientation={setOrientation}
           scale={scale}
-          onScaleChange={setScale}
+          onScaleChange={handleScaleChange}
           onNudge={(dx, dy) => {
             if (dx !== 0) handleNudge("x", dx);
             if (dy !== 0) handleNudge("y", dy);

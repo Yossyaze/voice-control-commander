@@ -100,6 +100,8 @@ const Canvas: React.FC<CanvasProps> = ({
 
     // Normalize coordinate system to use css pixels
     ctx.resetTransform(); // clear previous
+    // We only scale by DPR here for crisp rendering.
+    // The visual zoom is handled by CSS transform on the canvas element.
     ctx.scale(dpr, dpr);
 
     const render = () => {
@@ -169,7 +171,11 @@ const Canvas: React.FC<CanvasProps> = ({
               Math.abs(p.x - path.points[0].x) < 0.1 &&
               Math.abs(p.y - path.points[0].y) < 0.1,
           );
-        const s = 1 / scale; // Scale factor for constant visual size
+
+        // Keep visual size constant regardless of CSS transform scale:
+        // Since CSS scales the whole canvas visually, we draw it smaller logically
+        // to maintain its visual size on screen.
+        const s = 1 / scale;
 
         if (isTap) {
           // Draw Tap (Dot)
@@ -359,14 +365,10 @@ const Canvas: React.FC<CanvasProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
-    // Calculate scale in case canvas is displayed at different size than its logical size
-    // (though we try to keep them same via CSS max-width/height, aspect ratio might differ)
-    // Actually, rect.width/height are the display size. width/height props are logical size.
-    // Since we explicitly set style.width/height to scaled values, rect.width/height will reflect that.
-    // width/height props are logical size.
-    // scaleX = logical / visual.
-    // e.g. logical 100, scale 2.0 -> visual 200. scaleX = 0.5.
-    // Input 100 (center) -> offset 100 * 0.5 = 50. Correct.
+
+    // Since CSS transform scales the element, rect.width already includes the scale.
+    // We want the logical coordinate inside the canvas (0 to width), which ignores the scale.
+    // So if rect.width = 1000 and width = 500 (scale 2), scaleX will be 0.5.
     const scaleX = width / rect.width;
     const scaleY = height / rect.height;
 
@@ -578,7 +580,7 @@ const Canvas: React.FC<CanvasProps> = ({
 
     const rect = canvas.getBoundingClientRect();
 
-    // Handle High DPI
+    // getBoundingClientRect() は表示上のサイズを返すので、論理座標に変換する
     const dpr = window.devicePixelRatio || 1;
     const x = ((e.clientX - rect.left) * (canvas.width / rect.width)) / dpr;
     const y = ((e.clientY - rect.top) * (canvas.height / rect.height)) / dpr;
@@ -677,20 +679,13 @@ const Canvas: React.FC<CanvasProps> = ({
         // But React might override them if we don't pass them or pass them.
         // It's safer to pass undefined or let useEffect manage it.
         // However, for initial render (SSR/hydration), it's good to have them.
-        // Let's keep them but know useEffect will update them.
-        // Actually, if we pass width={width} here, React will set the attribute to logical width.
-        // Then useEffect sets it to width * dpr.
-        // If React re-renders, it might reset it to width.
-        // To avoid fighting with React, we should probably not pass width/height props to canvas element
-        // OR update the state to hold the physical dimensions.
-        // But simpler is to just let useEffect handle it and remove props from JSX.
-        className="border border-gray-200 rounded-sm shadow-xl bg-white transition-all duration-200"
+        // CSS Transform is used for zooming to integrate better with browser scrolling
+        className="border border-gray-200 rounded-sm shadow-xl bg-white"
         style={{
-          maxWidth: "none", // Allow it to grow
-          width: `${width * scale}px`, // Explicitly set visual size
+          maxWidth: "none",
+          width: `${width * scale}px`,
           height: `${height * scale}px`,
           cursor,
-          // Remove transform to rely on flow layout
           ...style,
         }}
         onMouseDown={handleMouseDown}

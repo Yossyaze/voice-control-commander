@@ -227,7 +227,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 ズーム: {Math.round(scale * 100)}%
               </div>
               <button
-                onClick={() => onScaleChange(Math.min(scale + 0.1, 3.0))}
+                onClick={() => onScaleChange(Math.min(scale + 0.1, 10.0))}
                 className="p-1 text-gray-400 hover:text-gray-600 hover:bg-white rounded transition-colors"
               >
                 <svg
