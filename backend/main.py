@@ -60,7 +60,7 @@ async def export_file(request: ExportRequest):
         modified_bytes = update_voice_control_commands(original_bytes, request.command_id, request.points)
         
         return {
-            "filename": "modified.voicecontrolcommands",
+            "filename": "modified.voicecontrolcom",
             "content": base64.b64encode(modified_bytes).decode('utf-8')
         }
     except Exception as e:
@@ -98,7 +98,7 @@ async def export_merged(request: ExportMergedRequest):
         
         import base64
         return {
-            "filename": "merged_commands.voicecontrolcommands",
+            "filename": "merged_commands.voicecontrolcom",
             "content": base64.b64encode(plist_bytes).decode('utf-8')
         }
     except Exception as e:
