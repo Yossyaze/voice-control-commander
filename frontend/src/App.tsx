@@ -3,8 +3,18 @@ import { arrayMove } from "@dnd-kit/sortable";
 import Canvas from "./components/Canvas";
 import ControlPanel from "./components/ControlPanel";
 import Sidebar from "./components/Sidebar";
-import { parseFile, API_BASE_URL } from "./api";
-import type { Point, Command } from "./api";
+import {
+  type Command,
+  type Point,
+  parseFile,
+  type EnvironmentSettings,
+  API_BASE_URL,
+  fetchProjects,
+  loadProject,
+  createProject,
+  updateProject,
+  type ProjectSummary,
+} from "./api";
 
 // Define Device Model Interface
 interface DeviceModel {
@@ -443,8 +453,116 @@ const COMMAND_COLORS = [
   "#e11d48", // Rose 600
 ];
 
+// --- localStorage ヘルパー ---
+const STORAGE_KEY = "voiceControlCommander";
+
+function loadState<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(`${STORAGE_KEY}_${key}`);
+    if (raw === null) return fallback;
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveState<T>(key: string, value: T): void {
+  try {
+    localStorage.setItem(`${STORAGE_KEY}_${key}`, JSON.stringify(value));
+  } catch {
+    // localStorage が満杯の場合など、エラーを握りつぶす
+  }
+}
+
 function App() {
-  const [commands, setCommands] = useState<Command[]>([]);
+  // --- 永続化される状態 (localStorage から復元) ---
+  const [commands, setCommands] = useState<Command[]>(() =>
+    loadState<Command[]>("commands", []),
+  );
+
+  // --- プロジェクト状態 ---
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(() =>
+    loadState<string | null>("currentProjectId", null),
+  );
+  const [currentProjectName, setCurrentProjectName] = useState<string>(() =>
+    loadState<string>("currentProjectName", "名称未設定プロジェクト"),
+  );
+  const [projectsList, setProjectsList] = useState<ProjectSummary[]>([]);
+
+  useEffect(() => {
+    fetchProjects()
+      .then(setProjectsList)
+      .catch((err) => console.error("Failed to load projects list", err));
+  }, []);
+
+  const handleCreateProject = async (name: string) => {
+    try {
+      const data = await createProject({
+        name,
+        commands,
+        settings: { selectedModelId, orientation, scale, backgroundImage },
+      });
+      if (data.id) {
+        setCurrentProjectId(data.id);
+        setCurrentProjectName(data.name);
+        setProjectsList((prev) => [...prev, { id: data.id!, name: data.name }]);
+        alert("プロジェクトを作成しました");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("プロジェクトの作成に失敗しました");
+    }
+  };
+
+  const handleSaveProject = async () => {
+    if (!currentProjectId) {
+      const name = prompt(
+        "新しいプロジェクト名を入力してください:",
+        currentProjectName,
+      );
+      if (name) {
+        await handleCreateProject(name);
+      }
+      return;
+    }
+    try {
+      await updateProject(currentProjectId, {
+        name: currentProjectName,
+        commands,
+        settings: { selectedModelId, orientation, scale, backgroundImage },
+      });
+      alert("プロジェクトを上書き保存しました");
+    } catch (err) {
+      console.error(err);
+      alert("保存に失敗しました");
+    }
+  };
+
+  const handleLoadProject = async (id: string) => {
+    try {
+      const data = await loadProject(id);
+      if (data.id) {
+        setCurrentProjectId(data.id);
+        setCurrentProjectName(data.name);
+        setCommands(data.commands);
+        if (data.settings) {
+          if (data.settings.selectedModelId)
+            setSelectedModelId(data.settings.selectedModelId as string);
+          if (data.settings.orientation)
+            setOrientation(
+              data.settings.orientation as "portrait" | "landscape",
+            );
+          if (data.settings.scale) setScale(data.settings.scale as number);
+          if (data.settings.backgroundImage !== undefined)
+            setBackgroundImage(data.settings.backgroundImage as string | null);
+        }
+        setActiveCommandId(null);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("読み込みに失敗しました");
+    }
+  };
 
   // Helper to get next color
   const getNextColor = (currentCommands: Command[]) => {
@@ -455,6 +573,7 @@ function App() {
     return COMMAND_COLORS[currentCommands.length % COMMAND_COLORS.length];
   };
 
+  // --- 一時的な状態 (永続化しない) ---
   const [activeCommandId, setActiveCommandId] = useState<string | null>(null);
   const [checkedCommandIds, setCheckedCommandIds] = useState<Set<string>>(
     new Set(),
@@ -466,26 +585,144 @@ function App() {
     "stroke",
   );
 
-  // Refactored Device State
-  const [selectedModelId, setSelectedModelId] =
-    useState<string>("iphone_16_pro"); // Default to iPhone 16 Pro
-  const [orientation, setOrientation] = useState<"portrait" | "landscape">(
-    "portrait",
-  );
-  const [scale, setScale] = useState<number>(0.6);
+  // --- 履歴管理 (Undo / Redo) ---
+  const [pastLevels, setPastLevels] = useState<Command[][]>([]);
+  const [futureLevels, setFutureLevels] = useState<Command[][]>([]);
 
-  const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
-  const [showGrid, setShowGrid] = useState<boolean>(false);
-  const [showPoints, setShowPoints] = useState<boolean>(true);
+  const saveToHistory = useCallback(
+    (currentCommands?: Command[]) => {
+      const stateToSave = currentCommands || commands;
+      setPastLevels((prev) => [
+        ...prev,
+        JSON.parse(JSON.stringify(stateToSave)),
+      ]);
+      setFutureLevels([]);
+    },
+    [commands],
+  );
+
+  const handleUndo = useCallback(() => {
+    if (pastLevels.length === 0) return;
+    const previousState = pastLevels[pastLevels.length - 1];
+    setPastLevels((prev) => prev.slice(0, -1));
+    setFutureLevels((prev) => [JSON.parse(JSON.stringify(commands)), ...prev]);
+    setCommands(previousState);
+    if (
+      activeCommandId &&
+      !previousState.find((c) => c.id === activeCommandId)
+    ) {
+      setActiveCommandId(null);
+      setSelectedStrokeIndex(null);
+    }
+  }, [pastLevels, commands, activeCommandId]);
+
+  const handleRedo = useCallback(() => {
+    if (futureLevels.length === 0) return;
+    const nextState = futureLevels[0];
+    setFutureLevels((prev) => prev.slice(1));
+    setPastLevels((prev) => [...prev, JSON.parse(JSON.stringify(commands))]);
+    setCommands(nextState);
+  }, [futureLevels, commands]);
+
+  // --- 永続化される表示設定 ---
+  const [selectedModelId, setSelectedModelId] = useState<string>(() =>
+    loadState<string>("selectedModelId", "iphone_16_pro"),
+  );
+  const [orientation, setOrientation] = useState<"portrait" | "landscape">(() =>
+    loadState<"portrait" | "landscape">("orientation", "portrait"),
+  );
+  const [scale, setScale] = useState<number>(() =>
+    loadState<number>("scale", 0.6),
+  );
+
+  const [backgroundImage, setBackgroundImage] = useState<string | null>(() =>
+    loadState<string | null>("backgroundImage", null),
+  );
+  const [showGrid, setShowGrid] = useState<boolean>(() =>
+    loadState<boolean>("showGrid", false),
+  );
+  const [showPoints, setShowPoints] = useState<boolean>(() =>
+    loadState<boolean>("showPoints", true),
+  );
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState<boolean>(true);
-  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState<boolean>(true);
+  const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState<boolean>(() =>
+    loadState<boolean>("isLeftSidebarOpen", true),
+  );
+  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState<boolean>(() =>
+    loadState<boolean>("isRightSidebarOpen", true),
+  );
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
+  // --- お気に入り環境設定 ---
+  const [favoriteEnvironments, setFavoriteEnvironments] = useState<
+    EnvironmentSettings[]
+  >(() => loadState<EnvironmentSettings[]>("favoriteEnvironments", []));
+
+  const handleSaveEnvironment = (name: string) => {
+    const newEnv: EnvironmentSettings = {
+      id: crypto.randomUUID
+        ? crypto.randomUUID()
+        : Math.random().toString(36).substring(2, 15),
+      name,
+      modelId: selectedModelId,
+      orientation,
+      scale,
+      showGrid,
+      showPoints,
+      backgroundImage,
+    };
+    setFavoriteEnvironments((prev) => [...prev, newEnv]);
+  };
+
+  const handleLoadEnvironment = (env: EnvironmentSettings) => {
+    setSelectedModelId(env.modelId);
+    setOrientation(env.orientation);
+    setScale(env.scale);
+    setShowGrid(env.showGrid);
+    setShowPoints(env.showPoints);
+    setBackgroundImage(env.backgroundImage);
+  };
+
+  const handleDeleteEnvironment = (id: string) => {
+    setFavoriteEnvironments((prev) => prev.filter((env) => env.id !== id));
+  };
+
+  // --- localStorage への自動保存 ---
+  useEffect(() => {
+    saveState("commands", commands);
+  }, [commands]);
+  useEffect(() => {
+    saveState("selectedModelId", selectedModelId);
+  }, [selectedModelId]);
+  useEffect(() => {
+    saveState("orientation", orientation);
+  }, [orientation]);
+  useEffect(() => {
+    saveState("scale", scale);
+  }, [scale]);
+  useEffect(() => {
+    saveState("backgroundImage", backgroundImage);
+  }, [backgroundImage]);
+  useEffect(() => {
+    saveState("showGrid", showGrid);
+  }, [showGrid]);
+  useEffect(() => {
+    saveState("showPoints", showPoints);
+  }, [showPoints]);
+  useEffect(() => {
+    saveState("isLeftSidebarOpen", isLeftSidebarOpen);
+  }, [isLeftSidebarOpen]);
+  useEffect(() => {
+    saveState("isRightSidebarOpen", isRightSidebarOpen);
+  }, [isRightSidebarOpen]);
+  useEffect(() => {
+    saveState("favoriteEnvironments", favoriteEnvironments);
+  }, [favoriteEnvironments]);
 
   // Remove unused state
   // const [showSettingsPopup, setShowSettingsPopup] = useState<boolean>(false);
-  const [duration, setDuration] = useState<number>(1.0); // Display value
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
+
   const [markerPosition, setMarkerPosition] = useState<Point | null>(null);
 
   const appRef = useRef<HTMLDivElement>(null);
@@ -699,6 +936,7 @@ function App() {
 
   // Command Management
   const handleCreateNewCommand = () => {
+    saveToHistory();
     const newId = crypto.randomUUID();
     const initialPoints = resamplePath(DEFAULT_COMMAND_POINTS, 0.4);
 
@@ -718,18 +956,44 @@ function App() {
     setActiveCommandId(newId);
     setSelectedStrokeIndex(0); // Select the first stroke by default for immediate editing
     setSelectionType("stroke");
-    setDuration(0.4);
-    setDuration(0.4);
     // Auto-select the new command in multi-select too? Or clear others?
-    setCheckedCommandIds(new Set([newId]));
+    // User requested: Do not check the checkbox automatically.
+    // setCheckedCommandIds(new Set([newId]));
+  };
+
+  const handleDuplicateCommand = (id: string) => {
+    const cmdToCopy = commands.find((c) => c.id === id);
+    if (!cmdToCopy) return;
+
+    saveToHistory();
+    const newId = crypto.randomUUID();
+    const duplicatedCommand: Command = {
+      ...JSON.parse(JSON.stringify(cmdToCopy)), // deep copy
+      id: newId,
+      name: `${cmdToCopy.name} (コピー)`,
+      color: getNextColor(commands),
+    };
+
+    setCommands((prev) => {
+      const index = prev.findIndex((c) => c.id === id);
+      if (index === -1) return [...prev, duplicatedCommand];
+      const next = [...prev];
+      next.splice(index + 1, 0, duplicatedCommand);
+      return next;
+    });
+
+    setActiveCommandId(newId);
+    setSelectedStrokeIndex(0);
+    setSelectionType("stroke");
   };
 
   const handleFileUpload = async (file: File) => {
     try {
       const result = await parseFile(file);
 
+      saveToHistory();
       const newCommands: Command[] = [];
-      let tempCommands = [...commands];
+      const tempCommands = [...commands];
 
       result.commands.forEach((c) => {
         // Ensure strokes are populated
@@ -768,7 +1032,7 @@ function App() {
   // const selectedCommand = ...
 
   // Helper functions for geometric transformations
-  const getSelectedStrokePoints = (): Point[] | null => {
+  const getSelectedStrokePoints = useCallback((): Point[] | null => {
     if (!selectedCommand) return null;
     if (selectedStrokeIndex !== null) {
       if (selectedStrokeIndex < selectedCommand.strokes.length) {
@@ -778,7 +1042,7 @@ function App() {
       return selectedCommand.strokes[0];
     }
     return null;
-  };
+  }, [selectedCommand, selectedStrokeIndex]);
 
   const calculateAngle = (points: Point[]): number => {
     if (points.length < 2) return 0;
@@ -802,10 +1066,11 @@ function App() {
 
   const updateSelectedStroke = (newPoints: Point[]) => {
     if (!activeCommandId) return;
+    saveToHistory();
     setCommands((prev) =>
       prev.map((cmd) => {
         if (cmd.id !== activeCommandId) return cmd;
-        let newStrokes = [...cmd.strokes];
+        const newStrokes = [...cmd.strokes];
         if (selectedStrokeIndex !== null) {
           if (selectedStrokeIndex < newStrokes.length) {
             newStrokes[selectedStrokeIndex] = newPoints;
@@ -846,29 +1111,20 @@ function App() {
     updateSelectedStroke(newPoints);
   };
 
-  const handleLengthChange = (newLength: number) => {
-    const points = getSelectedStrokePoints();
-    if (!points || points.length < 2) return;
-
-    const currentLen = calculateLength(points);
-    if (currentLen === 0) return;
-
-    const scale = newLength / currentLen;
-    const start = points[0];
-    const end = points[points.length - 1];
-    const mid = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
-
-    const newPoints = points.map((p) => ({
-      x: mid.x + (p.x - mid.x) * scale,
-      y: mid.y + (p.y - mid.y) * scale,
-    }));
-
-    updateSelectedStroke(newPoints);
+  const handleDurationChange = (newDur: number) => {
+    if (!activeCommandId) return;
+    if (selectedStrokeIndex !== null) {
+      const points = getSelectedStrokePoints();
+      if (!points || points.length < 2) return;
+      const newPoints = resamplePath(points, newDur);
+      updateSelectedStroke(newPoints);
+    }
   };
 
   const handleNudge = useCallback(
     (type: "x" | "y", delta: number) => {
       if (!activeCommandId) return;
+      saveToHistory();
       setCommands((prev) =>
         prev.map((cmd) => {
           if (cmd.id !== activeCommandId) return cmd;
@@ -896,12 +1152,13 @@ function App() {
         }),
       );
     },
-    [activeCommandId, selectedStrokeIndex],
+    [activeCommandId, selectedStrokeIndex, saveToHistory],
   );
 
   const handleCurve = () => {
     if (!activeCommandId) return;
 
+    saveToHistory();
     setCommands((prev) =>
       prev.map((cmd) => {
         if (cmd.id !== activeCommandId) return cmd;
@@ -965,6 +1222,7 @@ function App() {
   const handleMakeStraight = () => {
     if (!activeCommandId) return;
 
+    saveToHistory();
     setCommands((prev) =>
       prev.map((cmd) => {
         if (cmd.id !== activeCommandId) return cmd;
@@ -1002,12 +1260,12 @@ function App() {
   const currentAngle = useMemo(() => {
     const points = getSelectedStrokePoints();
     return points ? calculateAngle(points) : 0;
-  }, [selectedCommand, selectedStrokeIndex]);
+  }, [getSelectedStrokePoints]);
 
   const currentLength = useMemo(() => {
     const points = getSelectedStrokePoints();
     return points ? calculateLength(points) : 0;
-  }, [selectedCommand, selectedStrokeIndex]);
+  }, [getSelectedStrokePoints]);
 
   const currentHeadX = useMemo(() => {
     const points = getSelectedStrokePoints();
@@ -1017,7 +1275,7 @@ function App() {
       return (start.x + end.x) / 2;
     }
     return 0;
-  }, [selectedCommand, selectedStrokeIndex]);
+  }, [getSelectedStrokePoints]);
 
   const currentHeadY = useMemo(() => {
     const points = getSelectedStrokePoints();
@@ -1027,13 +1285,13 @@ function App() {
       return (start.y + end.y) / 2;
     }
     return 0;
-  }, [selectedCommand, selectedStrokeIndex]);
+  }, [getSelectedStrokePoints]);
 
   // Duration Sync:
   // If stroke selected -> Show stroke duration
   // If command selected -> Show total sequential duration (Read only preferably, or editable as global scale?)
   // User said "No need to set for command". So treating as Read Only or just informational.
-  useEffect(() => {
+  const displayDuration = useMemo(() => {
     if (selectedCommand) {
       if (
         selectedStrokeIndex !== null &&
@@ -1042,7 +1300,7 @@ function App() {
         // Specific stroke
         const s = selectedCommand.strokes[selectedStrokeIndex];
         // Allow shorter durations like 0.2s. Min 0.1s for safety.
-        setDuration(Math.max(0.1, Math.round((s.length / 60) * 10) / 10));
+        return Math.max(0.05, Math.round((s.length / 60) * 100) / 100);
       } else {
         // Total sequential time: Sum(strokes) + Sum(gaps)
         const waitTime =
@@ -1054,14 +1312,16 @@ function App() {
           if (i > 0) total += waitTime;
           total += Math.max(0.1, s.length / 60);
         });
-        setDuration(Math.round(total * 10) / 10);
+        return Math.round(total * 100) / 100;
       }
     }
-  }, [selectedCommand, selectedStrokeIndex]); // Add selectedStrokeIndex dependency
+    return 0;
+  }, [selectedCommand, selectedStrokeIndex]);
 
   const handleDeleteSelectedAction = useCallback(() => {
     if (!activeCommandId || selectedStrokeIndex === null) return;
 
+    saveToHistory();
     setCommands((prev) =>
       prev.map((cmd) => {
         if (cmd.id !== activeCommandId) return cmd;
@@ -1083,7 +1343,7 @@ function App() {
       // Let's stick to null (command selection) to be safe or index 0 if exists?
       // Let's just go null for now.
     }
-  }, [activeCommandId, selectedStrokeIndex]);
+  }, [activeCommandId, selectedStrokeIndex, saveToHistory]);
 
   // ==== 角度反転ハンドラー ====
   const handleFlipAngle = () => {
@@ -1146,6 +1406,7 @@ function App() {
             color: cmd.color || "#000",
             isSelected: isSelected,
             label: isSelected ? String(index + 1) : undefined,
+            showPoints: cmd.showPoints, // <-- Action-specific showPoints
           };
         });
       });
@@ -1188,6 +1449,76 @@ function App() {
     return connections;
   }, [selectedCommand]);
 
+  // 全コマンドを書き出す
+  const handleExportAll = async () => {
+    if (commands.length === 0) {
+      alert("書き出すコマンドがありません。");
+      return;
+    }
+
+    const commandsToExport = commands.map((cmd) => {
+      const strokeWaits = cmd.strokes.map(
+        (_, i) => cmd.strokeMetadata?.[i]?.waitAfter ?? cmd.waitDuration ?? 0.2,
+      );
+      return {
+        name: cmd.name,
+        points: [],
+        strokes: cmd.strokes,
+        stroke_waits: strokeWaits,
+      };
+    });
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/export_merged`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commands: commandsToExport }),
+      });
+
+      if (!response.ok) throw new Error("Export failed");
+      const result = await response.json();
+      const filename = result.filename || "all_commands.voicecontrolcom";
+
+      // @ts-expect-error showSaveFilePicker は型定義にない
+      if (window.showSaveFilePicker) {
+        // @ts-expect-error showSaveFilePicker は型定義にない
+        const handle = await window.showSaveFilePicker({
+          suggestedName: filename,
+          types: [
+            {
+              description: "Apple Voice Control Commands",
+              accept: { "application/octet-stream": [".voicecontrolcom"] },
+            },
+          ],
+        });
+        const writable = await handle.createWritable();
+        const binaryContent = Uint8Array.from(atob(result.content), (c) =>
+          c.charCodeAt(0),
+        );
+        await writable.write(binaryContent);
+        await writable.close();
+      } else {
+        const blob = new Blob(
+          [Uint8Array.from(atob(result.content), (c) => c.charCodeAt(0))],
+          { type: "application/octet-stream" },
+        );
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+    } catch (error: unknown) {
+      console.error("Export Error:", error);
+      const msg = error instanceof Error ? error.message : String(error);
+      alert(`エクスポートに失敗しました: ${msg}`);
+    }
+  };
+
+  // チェックしたコマンドを書き出す
   const handleBatchExport = async () => {
     const targetIds =
       checkedCommandIds.size > 0
@@ -1239,9 +1570,9 @@ function App() {
       }
 
       // Save file logic
-      // @ts-ignore
+      // @ts-expect-error showSaveFilePicker is not in standard DOM types
       if (typeof window.showSaveFilePicker === "function") {
-        // @ts-ignore
+        // @ts-expect-error showSaveFilePicker is not in standard DOM types
         const handle = await window.showSaveFilePicker({
           suggestedName: filename,
           types: [
@@ -1272,9 +1603,11 @@ function App() {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Export Error:", error);
-      alert(`エクスポートに失敗しました: ${error.message}`);
+      alert(
+        `エクスポートに失敗しました: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   };
 
@@ -1284,6 +1617,7 @@ function App() {
     if (!confirm(`${checkedCommandIds.size} 件のコマンドを削除しますか？`))
       return;
 
+    saveToHistory();
     setCommands((prev) => prev.filter((c) => !checkedCommandIds.has(c.id)));
 
     // Clear selection
@@ -1409,8 +1743,8 @@ function App() {
 
         // スケール感度の調整
         const delta = -e.deltaY * 0.01;
-        // カーソル座標を渡さず、ビューポート中心を基準にズームする
-        handleScaleChange((prev) => prev + delta);
+        // 指数関数的なズームに変更: e^delta を掛けることでどの倍率でも同じ変化量に感じる
+        handleScaleChange((prev) => prev * Math.exp(delta));
       }
     };
 
@@ -1500,6 +1834,7 @@ function App() {
   };
 
   const handleReorderCommands = (oldIndex: number, newIndex: number) => {
+    saveToHistory();
     setCommands((items) => arrayMove(items, oldIndex, newIndex));
   };
 
@@ -1508,6 +1843,7 @@ function App() {
     oldIndex: number,
     newIndex: number,
   ) => {
+    saveToHistory();
     setCommands((prev) =>
       prev.map((cmd) => {
         if (cmd.id !== commandId) return cmd;
@@ -1581,6 +1917,19 @@ function App() {
         return;
       }
 
+      const isMac = navigator.userAgent.toLowerCase().includes("mac");
+      const isCmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+
+      if (isCmdOrCtrl && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) {
+          handleRedo();
+        } else {
+          handleUndo();
+        }
+        return;
+      }
+
       if (e.code === "Space") {
         e.preventDefault();
         togglePlay();
@@ -1601,10 +1950,11 @@ function App() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [togglePlay, handleNudge]); // Dependencies ensure fresh closures
+  }, [togglePlay, handleNudge, handleUndo, handleRedo]); // Dependencies ensure fresh closures
 
   const handleWaitDurationChange = (newDuration: number) => {
     if (!activeCommandId) return;
+    saveToHistory();
     setCommands((prev) =>
       prev.map((c) =>
         c.id === activeCommandId ? { ...c, waitDuration: newDuration } : c,
@@ -1614,11 +1964,12 @@ function App() {
 
   const handleSelectedStrokeWaitChange = (newDuration: number) => {
     if (!activeCommandId) return;
+    saveToHistory();
     setCommands((prev) =>
       prev.map((c) => {
         if (c.id !== activeCommandId) return c;
 
-        let newMetadata = c.strokeMetadata ? [...c.strokeMetadata] : [];
+        const newMetadata = c.strokeMetadata ? [...c.strokeMetadata] : [];
         // Ensure metadata exists for all strokes
         while (newMetadata.length < c.strokes.length) {
           newMetadata.push({});
@@ -1672,28 +2023,33 @@ function App() {
           commands={commands}
           activeCommandId={activeCommandId}
           onSelectCommand={setActiveCommandId}
-          onDeleteCommand={(id) =>
-            setCommands((prev) => prev.filter((c) => c.id !== id))
-          }
-          onToggleVisibility={(id) =>
+          onDeleteCommand={(id) => {
+            saveToHistory();
+            setCommands((prev) => prev.filter((c) => c.id !== id));
+          }}
+          onDuplicateCommand={handleDuplicateCommand}
+          onToggleVisibility={(id) => {
+            saveToHistory();
             setCommands((prev) =>
               prev.map((c) =>
                 c.id === id ? { ...c, isVisible: !c.isVisible } : c,
               ),
-            )
-          }
+            );
+          }}
           onFileUpload={handleFileUpload}
           onCreateNew={handleCreateNewCommand}
-          onRenameCommand={(id, name) =>
+          onRenameCommand={(id, name) => {
+            saveToHistory();
             setCommands((prev) =>
               prev.map((c) => (c.id === id ? { ...c, name } : c)),
-            )
-          }
-          onUpdateCommand={(updatedCmd) =>
+            );
+          }}
+          onUpdateCommand={(updatedCmd) => {
+            saveToHistory();
             setCommands((prev) =>
               prev.map((c) => (c.id === updatedCmd.id ? updatedCmd : c)),
-            )
-          }
+            );
+          }}
           selectedStrokeIndex={selectedStrokeIndex}
           onSelectStroke={setSelectedStrokeIndex}
           selectionType={selectionType}
@@ -1706,6 +2062,10 @@ function App() {
           onBatchDelete={handleBatchDelete}
           onSelectAll={handleSelectAllCommands}
           onClearSelection={handleClearCommandSelection}
+          currentProjectId={currentProjectId}
+          projectsList={projectsList}
+          onLoadProject={handleLoadProject}
+          onSaveProject={handleSaveProject}
         />
         {/* Close button for fullscreen popup mode */}
         {isFullscreen && isLeftSidebarOpen && (
@@ -1797,6 +2157,53 @@ function App() {
               </h1>
             </div>
             <div className="flex items-center space-x-3">
+              {/* Undo / Redo */}
+              <div className="flex items-center space-x-1">
+                <button
+                  onClick={handleUndo}
+                  disabled={pastLevels.length === 0}
+                  className={`p-1.5 rounded transition-colors ${pastLevels.length === 0 ? "text-gray-300 cursor-not-allowed" : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"}`}
+                  title="元に戻す (Cmd+Z)"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+                    />
+                  </svg>
+                </button>
+                <button
+                  onClick={handleRedo}
+                  disabled={futureLevels.length === 0}
+                  className={`p-1.5 rounded transition-colors ${futureLevels.length === 0 ? "text-gray-300 cursor-not-allowed" : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"}`}
+                  title="やり直す (Cmd+Shift+Z)"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6"
+                    />
+                  </svg>
+                </button>
+              </div>
+              <div className="h-4 w-px bg-gray-300 mx-1" />
+
               <button
                 onClick={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
                 className="p-1.5 text-gray-500 hover:bg-gray-100 rounded transition-colors"
@@ -1824,10 +2231,10 @@ function App() {
               </button>
               <div className="h-4 w-px bg-gray-300 mx-2" />
               <button
-                onClick={handleBatchExport}
+                onClick={handleExportAll}
                 className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 shadow-sm transition-colors"
               >
-                書き出し
+                全コマンドを書き出す
               </button>
             </div>
           </div>
@@ -1991,23 +2398,51 @@ function App() {
           onToggleGrid={() => setShowGrid(!showGrid)}
           showPoints={showPoints}
           onTogglePoints={() => setShowPoints(!showPoints)}
-          onEnterFullscreen={handleToggleFullscreen}
-          isFullscreen={isFullscreen}
-          duration={duration}
-          onDurationChange={(newDur) => {
-            if (selectedStrokeIndex !== null) {
-              const points = getSelectedStrokePoints();
-              if (!points || points.length < 2) return;
-              const newPoints = resamplePath(points, newDur);
-              updateSelectedStroke(newPoints);
+          selectedCommandShowPoints={
+            selectedCommand ? selectedCommand.showPoints : undefined
+          }
+          onToggleCommandPoints={(show) => {
+            if (activeCommandId) {
+              setCommands((prev) =>
+                prev.map((cmd) =>
+                  cmd.id === activeCommandId
+                    ? { ...cmd, showPoints: show }
+                    : cmd,
+                ),
+              );
             }
           }}
+          onEnterFullscreen={handleToggleFullscreen}
+          isFullscreen={isFullscreen}
+          duration={displayDuration}
+          onDurationChange={handleDurationChange}
           isPlaying={isPlaying}
           onTogglePlay={togglePlay}
           angle={currentAngle}
           onAngleChange={handleAngleChange}
           length={currentLength}
-          onLengthChange={handleLengthChange}
+          onLengthChange={(newLen) => {
+            if (selectedStrokeIndex !== null) {
+              const points = getSelectedStrokePoints();
+              if (!points || points.length < 2) return;
+              const currentLen = calculateLength(points);
+              if (currentLen === 0) return;
+
+              const scaleFactor = newLen / currentLen;
+              const start = points[0];
+              const end = points[points.length - 1];
+              const mid = {
+                x: (start.x + end.x) / 2,
+                y: (start.y + end.y) / 2,
+              };
+
+              const newPoints = points.map((p) => ({
+                x: mid.x + (p.x - mid.x) * scaleFactor,
+                y: mid.y + (p.y - mid.y) * scaleFactor,
+              }));
+              updateSelectedStroke(newPoints);
+            }
+          }}
           onCurve={handleCurve}
           onStraight={handleMakeStraight}
           absoluteX={currentHeadX}
@@ -2030,6 +2465,10 @@ function App() {
               ? handleFlipAngle
               : undefined
           }
+          favoriteEnvironments={favoriteEnvironments}
+          onSaveEnvironment={handleSaveEnvironment}
+          onLoadEnvironment={handleLoadEnvironment}
+          onDeleteEnvironment={handleDeleteEnvironment}
         />
         {/* Close button for fullscreen popup mode */}
         {isFullscreen && isRightSidebarOpen && (

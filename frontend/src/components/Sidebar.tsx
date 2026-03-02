@@ -15,13 +15,14 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { Command, Point } from "../api";
+import type { Command, Point, ProjectSummary } from "../api";
 
 interface SidebarProps {
   commands: Command[];
   activeCommandId: string | null;
   onSelectCommand: (id: string) => void;
   onDeleteCommand: (id: string) => void;
+  onDuplicateCommand: (id: string) => void;
   onToggleVisibility: (id: string) => void;
   onFileUpload: (file: File) => void;
   onCreateNew: () => void;
@@ -45,6 +46,12 @@ interface SidebarProps {
   onBatchDelete: () => void;
   onSelectAll: () => void;
   onClearSelection: () => void;
+
+  // Project Management
+  currentProjectId: string | null;
+  projectsList: ProjectSummary[];
+  onLoadProject: (id: string) => void;
+  onSaveProject: () => void;
 }
 
 // ----------------------------------------------------------------------------
@@ -178,6 +185,7 @@ interface SortableCommandItemProps {
   onSelect: () => void;
   onToggleVisibility: () => void;
   onDelete: () => void;
+  onDuplicate: () => void;
   onUpdateCommand: (cmd: Command) => void;
 
   // Props for Stroke Selection/Sorting inside
@@ -203,6 +211,7 @@ const SortableCommandItem = ({
   onSelect,
   onToggleVisibility,
   onDelete,
+  onDuplicate,
   onUpdateCommand,
   selectedStrokeIndex,
   selectionType,
@@ -405,30 +414,57 @@ const SortableCommandItem = ({
             </span>
           </div>
 
-          {/* Delete Button */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-            className="text-gray-400 hover:text-red-600 hover:bg-red-50 rounded p-1 transition-colors"
-            title="コマンドを削除"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+          <div className="flex items-center space-x-1">
+            {/* Duplicate Button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDuplicate();
+              }}
+              className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded p-1 transition-colors"
+              title="コマンドを複製"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-              />
-            </svg>
-          </button>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"
+                />
+              </svg>
+            </button>
+
+            {/* Delete Button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              className="text-gray-400 hover:text-red-600 hover:bg-red-50 rounded p-1 transition-colors"
+              title="コマンドを削除"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -603,6 +639,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
     activeCommandId,
     onSelectCommand,
     onDeleteCommand,
+    onDuplicateCommand,
     onToggleVisibility,
     onFileUpload,
     onCreateNew,
@@ -620,6 +657,10 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
     onBatchDelete,
     onSelectAll,
     onClearSelection,
+    currentProjectId,
+    projectsList,
+    onLoadProject,
+    onSaveProject,
   } = props;
 
   const [editingId, setEditingId] = React.useState<string | null>(null);
@@ -659,6 +700,39 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
   return (
     <div className="w-64 bg-white flex flex-col h-full border-r border-gray-300 font-sans shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)] z-10">
       {/* Header / Toolbar */}
+      <div className="px-4 py-3 border-b border-gray-300 bg-gray-50 flex flex-col space-y-2 flex-shrink-0">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-bold text-gray-600 tracking-wider uppercase">
+            プロジェクト
+          </h2>
+          <button
+            onClick={onSaveProject}
+            className="text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 py-1 rounded transition-colors"
+          >
+            保存
+          </button>
+        </div>
+        <select
+          value={currentProjectId || ""}
+          onChange={(e) => {
+            const val = e.target.value;
+            if (val === "new") {
+              onSaveProject(); // Triggers prompt to create new
+            } else if (val) {
+              onLoadProject(val);
+            }
+          }}
+          className="w-full text-sm border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 p-1.5 bg-white shadow-sm"
+        >
+          <option value="">(未保存のプロジェクト)</option>
+          {projectsList.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+          <option value="new">+ 新規作成</option>
+        </select>
+      </div>
       <div className="h-12 px-4 border-b border-gray-300 bg-gray-50 flex items-center justify-between flex-shrink-0">
         <h2 className="text-xs font-bold text-gray-600 tracking-wider uppercase">
           コマンド
@@ -815,6 +889,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                     }}
                     onToggleVisibility={() => onToggleVisibility(cmd.id)}
                     onDelete={() => onDeleteCommand(cmd.id)}
+                    onDuplicate={() => onDuplicateCommand(cmd.id)}
                     onUpdateCommand={onUpdateCommand}
                     selectedStrokeIndex={selectedStrokeIndex}
                     selectionType={selectionType}

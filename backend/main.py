@@ -6,6 +6,13 @@ import plistlib
 import uvicorn
 import io
 from parser import parse_voice_control_commands, update_voice_control_commands
+import os
+import json
+import uuid
+
+PROJECTS_DIR = "projects"
+if not os.path.exists(PROJECTS_DIR):
+    os.makedirs(PROJECTS_DIR)
 
 app = FastAPI()
 
@@ -101,6 +108,98 @@ async def export_merged(request: ExportMergedRequest):
             "filename": "merged_commands.voicecontrolcom",
             "content": base64.b64encode(plist_bytes).decode('utf-8')
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class ProjectData(BaseModel):
+    name: str
+    commands: List[Dict[str, Any]]
+    settings: Dict[str, Any]
+
+@app.get("/api/projects")
+async def list_projects():
+    try:
+        projects = []
+        for filename in os.listdir(PROJECTS_DIR):
+            if filename.endswith(".json"):
+                filepath = os.path.join(PROJECTS_DIR, filename)
+                with open(filepath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    projects.append({
+                        "id": filename[:-5],
+                        "name": data.get("name", "Unknown Project")
+                    })
+        return projects
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/projects/{project_id}")
+async def get_project(project_id: str):
+    try:
+        filepath = os.path.join(PROJECTS_DIR, f"{project_id}.json")
+        if not os.path.exists(filepath):
+            raise HTTPException(status_code=404, detail="Project not found")
+        with open(filepath, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/projects")
+async def create_project(data: ProjectData):
+    try:
+        project_id = str(uuid.uuid4())
+        filepath = os.path.join(PROJECTS_DIR, f"{project_id}.json")
+        
+        project_content = {
+            "id": project_id,
+            "name": data.name,
+            "commands": data.commands,
+            "settings": data.settings
+        }
+        
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(project_content, f, ensure_ascii=False, indent=2)
+            
+        return project_content
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/api/projects/{project_id}")
+async def update_project(project_id: str, data: ProjectData):
+    try:
+        filepath = os.path.join(PROJECTS_DIR, f"{project_id}.json")
+        if not os.path.exists(filepath):
+            raise HTTPException(status_code=404, detail="Project not found")
+            
+        project_content = {
+            "id": project_id,
+            "name": data.name,
+            "commands": data.commands,
+            "settings": data.settings
+        }
+        
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(project_content, f, ensure_ascii=False, indent=2)
+            
+        return project_content
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/projects/{project_id}")
+async def delete_project(project_id: str):
+    try:
+        filepath = os.path.join(PROJECTS_DIR, f"{project_id}.json")
+        if not os.path.exists(filepath):
+            raise HTTPException(status_code=404, detail="Project not found")
+            
+        os.remove(filepath)
+        return {"success": True}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
