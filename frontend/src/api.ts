@@ -49,6 +49,7 @@ export interface VoiceControlFile {
 }
 
 export const API_BASE_URL = "http://localhost:8000/api";
+export const SERVER_URL = API_BASE_URL.replace("/api", "");
 
 export const parseFile = async (file: File): Promise<ParseResult> => {
   const formData = new FormData();
@@ -160,4 +161,45 @@ export const deleteProject = async (id: string): Promise<void> => {
   if (!response.ok) {
     throw new Error("Failed to delete project");
   }
+  return response.json();
 };
+
+// ----------------------------------------------------------------------------
+// Backgrounds API
+// ----------------------------------------------------------------------------
+export interface BackgroundImage {
+  id: string;
+  url: string;
+}
+
+export async function fetchBackgrounds(): Promise<BackgroundImage[]> {
+  const response = await fetch(`${API_BASE_URL}/backgrounds`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch backgrounds: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function uploadBackground(file: File): Promise<BackgroundImage> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${API_BASE_URL}/backgrounds`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to upload background: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function deleteBackground(id: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/backgrounds/${id}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to delete background: ${response.statusText}`);
+  }
+}

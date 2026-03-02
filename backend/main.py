@@ -14,6 +14,10 @@ PROJECTS_DIR = "projects"
 if not os.path.exists(PROJECTS_DIR):
     os.makedirs(PROJECTS_DIR)
 
+BACKGROUNDS_DIR = "backgrounds"
+if not os.path.exists(BACKGROUNDS_DIR):
+    os.makedirs(BACKGROUNDS_DIR)
+
 app = FastAPI()
 
 app.add_middleware(
@@ -23,6 +27,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+from fastapi.staticfiles import StaticFiles
+app.mount("/api/backgrounds/files", StaticFiles(directory=BACKGROUNDS_DIR), name="backgrounds")
 
 class Point(BaseModel):
     x: float
@@ -191,15 +198,70 @@ async def update_project(project_id: str, data: ProjectData):
 
 @app.delete("/api/projects/{project_id}")
 async def delete_project(project_id: str):
+    filepath = os.path.join(PROJECTS_DIR, f"{project_id}.json")
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="Project not found")
+    
     try:
-        filepath = os.path.join(PROJECTS_DIR, f"{project_id}.json")
-        if not os.path.exists(filepath):
-            raise HTTPException(status_code=404, detail="Project not found")
-            
         os.remove(filepath)
         return {"success": True}
-    except HTTPException:
-        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==========================================
+# Backgrounds API
+# ==========================================
+
+@app.get("/api/backgrounds")
+async def list_backgrounds():
+    try:
+        images = []
+        for filename in os.listdir(BACKGROUNDS_DIR):
+            if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
+                images.append({
+                    "id": filename,
+                    "url": f"/api/backgrounds/files/{filename}"
+                })
+        # Sort by creation time (newest first)
+        images.sort(key=lambda x: os.path.getctime(os.path.join(BACKGROUNDS_DIR, x["id"])), reverse=True)
+        return images
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/backgrounds")
+async def upload_background(file: UploadFile = File(...)):
+    if not file.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
+        raise HTTPException(status_code=400, detail="Unsupported file format")
+    
+    # Generate unique filename to avoid overwrites
+    ext = os.path.splitext(file.filename)[1]
+    unique_filename = f"{uuid.uuid4()}{ext}"
+    filepath = os.path.join(BACKGROUNDS_DIR, unique_filename)
+    
+    try:
+        content = await file.read()
+        with open(filepath, "wb") as f:
+            f.write(content)
+        return {
+            "id": unique_filename,
+            "url": f"/api/backgrounds/files/{unique_filename}"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/backgrounds/{image_id}")
+async def delete_background(image_id: str):
+    # Security: prevent path traversal
+    if ".." in image_id or "/" in image_id or "\\" in image_id:
+        raise HTTPException(status_code=400, detail="Invalid image ID")
+        
+    filepath = os.path.join(BACKGROUNDS_DIR, image_id)
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="Image not found")
+    
+    try:
+        os.remove(filepath)
+        return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

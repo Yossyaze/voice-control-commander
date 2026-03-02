@@ -9,6 +9,7 @@ interface PathData {
   color: string;
   isSelected: boolean;
   label?: string;
+  showPoints?: boolean;
 }
 
 interface CanvasProps {
@@ -38,6 +39,7 @@ interface CanvasProps {
     to: Point;
     duration: number;
     strokeIndex: number; // Index of the stroke that *precedes* this gap (the one holding the wait-after)
+    isSelected?: boolean;
   }[];
   onSelectWait?: (strokeIndex: number) => void;
 }
@@ -94,15 +96,13 @@ const Canvas: React.FC<CanvasProps> = ({
     // Handle High DPI (Retina) displays
     const dpr = window.devicePixelRatio || 1;
 
-    // Set actual size in memory (scaled to account for extra pixel density)
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
+    // Set actual size in memory (scaled to account for extra pixel density AND zoom scale)
+    canvas.width = width * dpr * scale;
+    canvas.height = height * dpr * scale;
 
-    // Normalize coordinate system to use css pixels
+    // Normalize coordinate system to use css pixels, scaled by zoom scale
     ctx.resetTransform(); // clear previous
-    // We only scale by DPR here for crisp rendering.
-    // The visual zoom is handled by CSS transform on the canvas element.
-    ctx.scale(dpr, dpr);
+    ctx.scale(dpr * scale, dpr * scale);
 
     const render = () => {
       // Clear canvas (using logical coordinates, but we need to clear the whole scaled buffer)
@@ -172,25 +172,20 @@ const Canvas: React.FC<CanvasProps> = ({
               Math.abs(p.y - path.points[0].y) < 0.1,
           );
 
-        // Keep visual size constant regardless of CSS transform scale:
-        // Since CSS scales the whole canvas visually, we draw it smaller logically
-        // to maintain its visual size on screen.
-        const s = 1 / scale;
-
         if (isTap) {
           // Draw Tap (Dot)
           const point = path.points[0];
           ctx.beginPath();
-          ctx.arc(point.x, point.y, 5 * s, 0, Math.PI * 2);
+          ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
           ctx.fillStyle = path.color + "40"; // Transparent fill
           ctx.fill();
-          ctx.lineWidth = (path.isSelected ? 2 : 1) * s;
+          ctx.lineWidth = path.isSelected ? 2 : 1;
           ctx.strokeStyle = path.color;
           ctx.stroke();
 
           // Dot
           ctx.beginPath();
-          ctx.arc(point.x, point.y, 2 * s, 0, Math.PI * 2);
+          ctx.arc(point.x, point.y, 2, 0, Math.PI * 2);
           ctx.fillStyle = path.color;
           ctx.fill();
 
@@ -215,12 +210,14 @@ const Canvas: React.FC<CanvasProps> = ({
             ctx.lineTo(path.points[i].x, path.points[i].y);
           }
           ctx.strokeStyle = path.color;
-          ctx.lineWidth = (path.isSelected ? 2 : 1) * s;
+          ctx.lineWidth = path.isSelected ? 2 : 1;
           ctx.stroke();
 
-          // Draw Start/End Points (Always visible)
-          if (showPoints) {
-            const pointRadius = (path.isSelected ? 4 : 2.5) * s; // Smaller for non-selected
+          // Draw Start/End Points (Override per path if defined, otherwise use global)
+          const shouldShowPoints =
+            path.showPoints !== undefined ? path.showPoints : showPoints;
+          if (shouldShowPoints) {
+            const pointRadius = path.isSelected ? 4 : 2.5; // Smaller for non-selected
 
             // Start Point (Green)
             ctx.fillStyle = "#10B981";
@@ -288,9 +285,9 @@ const Canvas: React.FC<CanvasProps> = ({
       if (markerPosition) {
         ctx.beginPath();
         ctx.arc(markerPosition.x, markerPosition.y, 6, 0, Math.PI * 2);
-        ctx.fillStyle = "#ef4444"; // red-500
+        ctx.fillStyle = "rgba(59, 130, 246, 0.8)"; // blue-500
         ctx.fill();
-        ctx.strokeStyle = "#fff";
+        ctx.strokeStyle = "white";
         ctx.lineWidth = 2;
         ctx.stroke();
       }
@@ -312,36 +309,35 @@ const Canvas: React.FC<CanvasProps> = ({
           // Draw Badge
           const midX = (conn.from.x + conn.to.x) / 2;
           const midY = (conn.from.y + conn.to.y) / 2;
-          const text = `${conn.duration}s`;
 
-          ctx.font = "10px sans-serif";
-          const metrics = ctx.measureText(text);
-          const padding = 4;
-          const w = metrics.width + padding * 2;
-          const h = 14;
-
-          // Draw badge background
-          const rectX = midX - w / 2;
-          const rectY = midY - h / 2;
-
-          ctx.fillStyle = "#dbeafe"; // blue-100
-          ctx.strokeStyle = "#3b82f6"; // blue-500
-          ctx.lineWidth = 1;
-
-          ctx.beginPath();
-          ctx.roundRect(rectX, rectY, w, h, 4);
-          ctx.fill();
-          ctx.stroke();
-
-          // Draw text
-          ctx.fillStyle = "#1e40af"; // blue-800
+          ctx.fillStyle = conn.isSelected ? "#10B981" : "#9CA3AF";
+          ctx.font = "bold 12px sans-serif";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
-          ctx.fillText(text, midX, midY);
+
+          ctx.beginPath();
+          const padding = 6;
+          const textWidth = ctx.measureText(`${conn.duration}s`).width;
+          ctx.roundRect(
+            midX - textWidth / 2 - padding,
+            midY - 10,
+            textWidth + padding * 2,
+            20,
+            4,
+          );
+          ctx.fill();
+
+          ctx.fillStyle = "white";
+          ctx.fillText(`${conn.duration}s`, midX, midY);
 
           // Store hit region
           badgesRef.current.push({
-            rect: { x: rectX, y: rectY, w, h },
+            rect: {
+              x: midX - textWidth / 2 - padding,
+              y: midY - 10,
+              w: textWidth + padding * 2,
+              h: 20,
+            },
             strokeIndex: conn.strokeIndex,
           });
         });
@@ -361,21 +357,16 @@ const Canvas: React.FC<CanvasProps> = ({
     scale, // Added scale to dependencies
   ]);
 
-  const getMousePos = (e: React.MouseEvent) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
-    const rect = canvas.getBoundingClientRect();
-
-    // Since CSS transform scales the element, rect.width already includes the scale.
-    // We want the logical coordinate inside the canvas (0 to width), which ignores the scale.
-    // So if rect.width = 1000 and width = 500 (scale 2), scaleX will be 0.5.
-    const scaleX = width / rect.width;
-    const scaleY = height / rect.height;
-
-    return {
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top) * scaleY,
-    };
+  const getLogicalPosition = (
+    e: React.PointerEvent | React.MouseEvent<HTMLDivElement>,
+  ) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
+    // `rect.left` and `rect.width` now reflect the fully scaled size explicitly
+    // Coordinate within the element, scaled back down to the 1.0 (unscaled) logical coordinate size
+    const x = ((e.clientX - rect.left) / rect.width) * width;
+    const y = ((e.clientY - rect.top) / rect.height) * height;
+    return { x, y };
   };
 
   const isPointNear = (
@@ -432,9 +423,9 @@ const Canvas: React.FC<CanvasProps> = ({
     return false;
   };
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!onPathDrag) return;
-    const pos = getMousePos(e);
+    const pos = getLogicalPosition(e);
 
     // Check selected path first
     const selectedPath = paths.find((p) => p.isSelected);
@@ -448,20 +439,19 @@ const Canvas: React.FC<CanvasProps> = ({
         );
 
       let type: "move" | "start" | "end" | null = null;
-      const s = 1 / scale;
       if (isTap) {
-        if (isPointNear(pos, selectedPath.points[0], 15 * s)) type = "move";
+        if (isPointNear(pos, selectedPath.points[0], 15)) type = "move";
       } else {
-        if (isPointNear(pos, selectedPath.points[0], 10 * s)) type = "start";
+        if (isPointNear(pos, selectedPath.points[0], 10)) type = "start";
         else if (
           isPointNear(
             pos,
             selectedPath.points[selectedPath.points.length - 1],
-            10 * s,
+            10,
           )
         )
           type = "end";
-        else if (isPointOnPath(pos, selectedPath.points, 10 * s)) type = "move";
+        else if (isPointOnPath(pos, selectedPath.points, 10)) type = "move";
       }
 
       if (type) {
@@ -479,8 +469,8 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    const pos = getMousePos(e);
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const pos = getLogicalPosition(e);
 
     if (dragState.targetId && dragState.dragType && onPathDrag) {
       // Check if we should start dragging
@@ -520,25 +510,24 @@ const Canvas: React.FC<CanvasProps> = ({
             Math.abs(p.x - selectedPath.points[0].x) < 0.1 &&
             Math.abs(p.y - selectedPath.points[0].y) < 0.1,
         );
-      const s = 1 / scale;
 
       if (isTap) {
-        if (isPointNear(pos, selectedPath.points[0], 15 * s)) {
+        if (isPointNear(pos, selectedPath.points[0], 15)) {
           setCursor("move");
         } else {
           setCursor("default");
         }
       } else {
         if (
-          isPointNear(pos, selectedPath.points[0], 10 * s) ||
+          isPointNear(pos, selectedPath.points[0], 10) ||
           isPointNear(
             pos,
             selectedPath.points[selectedPath.points.length - 1],
-            10 * s,
+            10,
           )
         ) {
           setCursor("crosshair");
-        } else if (isPointOnPath(pos, selectedPath.points, 10 * s)) {
+        } else if (isPointOnPath(pos, selectedPath.points, 10)) {
           setCursor("move");
         } else {
           setCursor("default");
@@ -566,24 +555,18 @@ const Canvas: React.FC<CanvasProps> = ({
     });
   };
 
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    // If we were dragging (checked via ref since state is reset on MouseUp), don't treat as click
-    if (wasDraggingRef.current) {
-      wasDraggingRef.current = false; // Reset
-      return;
-    }
+  const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Ignore click if we were dragging
+    if (dragState.isDragging) return;
 
-    if (!onSelectCommand && !onSelectWait) return;
+    if (paths.length === 0) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const rect = canvas.getBoundingClientRect();
-
-    // getBoundingClientRect() は表示上のサイズを返すので、論理座標に変換する
-    const dpr = window.devicePixelRatio || 1;
-    const x = ((e.clientX - rect.left) * (canvas.width / rect.width)) / dpr;
-    const y = ((e.clientY - rect.top) * (canvas.height / rect.height)) / dpr;
+    const pos = getLogicalPosition(e);
+    const x = pos.x;
+    const y = pos.y;
 
     // Check badge clicks first (High priority)
     if (onSelectWait) {
@@ -612,7 +595,6 @@ const Canvas: React.FC<CanvasProps> = ({
             Math.abs(p.x - path.points[0].x) < 0.1 &&
             Math.abs(p.y - path.points[0].y) < 0.1,
         );
-      const s = 1 / scale;
 
       if (isTap) {
         // Check hit on Tap (Dot)
@@ -620,7 +602,7 @@ const Canvas: React.FC<CanvasProps> = ({
         const dx = x - point.x;
         const dy = y - point.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < 15 * s) {
+        if (dist < 15) {
           // Slightly larger hit area for taps
           onSelectCommand?.(path.fileId, path.commandId, path.id);
           return;
@@ -661,7 +643,7 @@ const Canvas: React.FC<CanvasProps> = ({
           const dy = y - yy;
           const dist = Math.sqrt(dx * dx + dy * dy);
 
-          if (dist < 10 * s) {
+          if (dist < 10) {
             // Hit threshold
             onSelectCommand?.(path.fileId, path.commandId, path.id);
             return;
@@ -671,28 +653,31 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   };
 
+  const handlers = {
+    onMouseDown: handleMouseDown,
+    onMouseMove: handleMouseMove,
+    onMouseUp: handleMouseUp,
+    onMouseLeave: handleMouseUp,
+    onClick: handleCanvasClick,
+  };
+
   return (
-    <div className="flex justify-center items-center bg-gray-50 p-4 rounded-lg h-full w-full">
+    <div
+      {...handlers}
+      className={`touch-none ${
+        dragState.dragType ? "cursor-grabbing" : `cursor-${cursor}`
+      } relative bg-gray-50 shadow-inner`}
+      style={{
+        ...style,
+        width: `${width * scale}px`,
+        height: `${height * scale}px`,
+        transformOrigin: "center center",
+      }}
+    >
       <canvas
         ref={canvasRef}
-        // Do not set width/height attributes here as they are handled in useEffect for DPR
-        // But React might override them if we don't pass them or pass them.
-        // It's safer to pass undefined or let useEffect manage it.
-        // However, for initial render (SSR/hydration), it's good to have them.
-        // CSS Transform is used for zooming to integrate better with browser scrolling
-        className="border border-gray-200 rounded-sm shadow-xl bg-white"
-        style={{
-          maxWidth: "none",
-          width: `${width * scale}px`,
-          height: `${height * scale}px`,
-          cursor,
-          ...style,
-        }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onClick={handleCanvasClick}
+        className="absolute inset-0 pointer-events-none"
+        style={{ width: "100%", height: "100%" }}
       />
     </div>
   );

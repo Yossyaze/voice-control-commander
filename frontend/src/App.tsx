@@ -9,11 +9,16 @@ import {
   parseFile,
   type EnvironmentSettings,
   API_BASE_URL,
+  SERVER_URL,
   fetchProjects,
   loadProject,
   createProject,
   updateProject,
   type ProjectSummary,
+  type BackgroundImage,
+  fetchBackgrounds,
+  uploadBackground,
+  deleteBackground,
 } from "./api";
 
 // Define Device Model Interface
@@ -638,6 +643,21 @@ function App() {
   const [backgroundImage, setBackgroundImage] = useState<string | null>(() =>
     loadState<string | null>("backgroundImage", null),
   );
+
+  const [backgroundsList, setBackgroundsList] = useState<BackgroundImage[]>([]);
+
+  // 起動時に背景画像リストを取得
+  useEffect(() => {
+    const loadBackgrounds = async () => {
+      try {
+        const bgData = await fetchBackgrounds();
+        setBackgroundsList(bgData);
+      } catch (err) {
+        console.error("背景画像の取得に失敗しました:", err);
+      }
+    };
+    loadBackgrounds();
+  }, []);
   const [showGrid, setShowGrid] = useState<boolean>(() =>
     loadState<boolean>("showGrid", false),
   );
@@ -1881,13 +1901,35 @@ function App() {
     }
   };
 
-  const handleBackgroundImageUpload = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setBackgroundImage(e.target?.result as string);
+  const handleBackgroundImageUpload = async (file: File) => {
+    try {
+      const bgImage = await uploadBackground(file);
+      const imageUrl = `${SERVER_URL}${bgImage.url}`;
+      setBackgroundImage(imageUrl);
+
+      // Update backgrounds list
+      setBackgroundsList((prev) => [bgImage, ...prev]);
+
       // Device detection logic (simplified for brevity)
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error("Failed to upload background:", err);
+      alert("背景画像のアップロードに失敗しました。");
+    }
+  };
+
+  const handleDeleteBackground = async (id: string) => {
+    try {
+      await deleteBackground(id);
+      setBackgroundsList((prev) => prev.filter((bg) => bg.id !== id));
+
+      // If the deleted image was currently selected, clear it
+      if (backgroundImage && backgroundImage.includes(id)) {
+        setBackgroundImage(null);
+      }
+    } catch (err) {
+      console.error("Failed to delete background:", err);
+      alert("背景画像の削除に失敗しました。");
+    }
   };
 
   const handleClearBackgroundImage = () => setBackgroundImage(null);
@@ -2393,7 +2435,10 @@ function App() {
           }}
           onExport={handleBatchExport}
           onBackgroundImageUpload={handleBackgroundImageUpload}
+          onBackgroundImageSelect={(url) => setBackgroundImage(url)}
           onClearBackgroundImage={handleClearBackgroundImage}
+          backgroundsList={backgroundsList}
+          onDeleteBackground={handleDeleteBackground}
           showGrid={showGrid}
           onToggleGrid={() => setShowGrid(!showGrid)}
           showPoints={showPoints}

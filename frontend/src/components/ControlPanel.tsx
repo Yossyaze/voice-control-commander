@@ -1,4 +1,5 @@
-import React, { useRef } from "react";
+import React, { useRef, useEffect, useCallback } from "react";
+import { type BackgroundImage, SERVER_URL } from "../api";
 
 interface DeviceModel {
   id: string;
@@ -17,11 +18,16 @@ interface ControlPanelProps {
   orientation: "portrait" | "landscape";
   onSelectOrientation: (orientation: "portrait" | "landscape") => void;
   onBackgroundImageUpload: (file: File) => void;
+  onBackgroundImageSelect?: (url: string) => void;
   onClearBackgroundImage: () => void;
+  backgroundsList?: BackgroundImage[];
+  onDeleteBackground?: (id: string) => void;
   showGrid: boolean;
   onToggleGrid: (show: boolean) => void;
   showPoints: boolean;
   onTogglePoints: (show: boolean) => void;
+  selectedCommandShowPoints?: boolean; // <-- 追加: 選択中アクション個別の設定
+  onToggleCommandPoints?: (show: boolean) => void; // <-- 追加: 選択中アクション個別の設定変更
   onEnterFullscreen: () => void;
   isFullscreen?: boolean;
   duration: number;
@@ -46,6 +52,12 @@ interface ControlPanelProps {
   selectionType?: "stroke" | "wait";
   onDeleteSelectedAction?: () => void;
   onFlipAngle?: () => void;
+
+  // Favorites Feature
+  favoriteEnvironments?: import("../api").EnvironmentSettings[];
+  onSaveEnvironment?: (name: string) => void;
+  onLoadEnvironment?: (env: import("../api").EnvironmentSettings) => void;
+  onDeleteEnvironment?: (id: string) => void;
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = ({
@@ -59,11 +71,16 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   onNudge,
   onExport,
   onBackgroundImageUpload,
+  onBackgroundImageSelect,
   onClearBackgroundImage,
+  backgroundsList = [],
+  onDeleteBackground,
   showGrid,
   onToggleGrid,
   showPoints,
   onTogglePoints,
+  selectedCommandShowPoints,
+  onToggleCommandPoints,
   onEnterFullscreen,
   isFullscreen,
   duration,
@@ -86,10 +103,53 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   selectionType = "stroke",
   onDeleteSelectedAction,
   onFlipAngle,
+  favoriteEnvironments = [],
+  onSaveEnvironment,
+  onLoadEnvironment,
+  onDeleteEnvironment,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const formatCoord = (n: number) => Math.round(n);
+
+  // --- Long Press Logic for Angle ---
+  const currentAngleRef = useRef(angle);
+  useEffect(() => {
+    currentAngleRef.current = angle;
+  }, [angle]);
+
+  const pressTimerRef = useRef<number | null>(null);
+  const pressIntervalRef = useRef<number | null>(null);
+
+  const stopPress = useCallback(() => {
+    if (pressTimerRef.current !== null)
+      window.clearTimeout(pressTimerRef.current);
+    if (pressIntervalRef.current !== null)
+      window.clearInterval(pressIntervalRef.current);
+  }, []);
+
+  const startPress = useCallback(
+    (delta: number) => {
+      // Single tap action
+      let nextAngle = (currentAngleRef.current + delta + 1024) % 1024;
+      onAngleChange(nextAngle);
+
+      // Initial delay for long press
+      pressTimerRef.current = window.setTimeout(() => {
+        // Repeat interval
+        pressIntervalRef.current = window.setInterval(() => {
+          nextAngle = (currentAngleRef.current + delta + 1024) % 1024;
+          onAngleChange(nextAngle);
+        }, 50); // Fast repeat rate (50ms)
+      }, 300);
+    },
+    [onAngleChange],
+  );
+
+  useEffect(() => {
+    return stopPress;
+  }, [stopPress]);
+  // ------------------------------------
 
   return (
     <div className="w-72 bg-white flex flex-col h-full border-l border-gray-200 font-sans shadow-xl z-20 overflow-hidden">
@@ -128,6 +188,73 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block">
             環境設定
           </label>
+
+          {/* Favorties Dropdown & Actions */}
+          <div className="flex flex-col space-y-2 bg-blue-50/50 p-2 rounded-md border border-blue-100">
+            <div className="flex items-center space-x-2">
+              <select
+                className="flex-1 text-xs border-gray-300 rounded shadow-sm focus:border-blue-500 py-1.5 pl-2 pr-6 bg-white"
+                onChange={(e) => {
+                  if (e.target.value === "") return;
+                  const env = favoriteEnvironments.find(
+                    (env) => env.id === e.target.value,
+                  );
+                  if (env && onLoadEnvironment) onLoadEnvironment(env);
+                  e.target.value = ""; // Reset after load
+                }}
+                defaultValue=""
+              >
+                <option value="" disabled>
+                  🌟 お気に入りを読み込む...
+                </option>
+                {favoriteEnvironments.map((env) => (
+                  <option key={env.id} value={env.id}>
+                    {env.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => {
+                  const name = window.prompt(
+                    "現在の環境設定に名前を付けて保存します。",
+                  );
+                  if (name && name.trim() && onSaveEnvironment) {
+                    onSaveEnvironment(name.trim());
+                  }
+                }}
+                className="px-2 py-1.5 bg-blue-500 text-white rounded text-xs font-medium hover:bg-blue-600 transition"
+                title="現在の設定をお気に入りに追加"
+              >
+                保存
+              </button>
+            </div>
+
+            {favoriteEnvironments.length > 0 && (
+              <div className="flex items-center space-x-2 mt-1 relative">
+                <select
+                  className="flex-1 text-[10px] text-red-600 border-red-200 rounded shadow-sm py-1 pl-2 pr-6 bg-white/80"
+                  onChange={(e) => {
+                    if (e.target.value === "") return;
+                    if (window.confirm("このお気に入り設定を削除しますか？")) {
+                      if (onDeleteEnvironment)
+                        onDeleteEnvironment(e.target.value);
+                    }
+                    e.target.value = ""; // Reset
+                  }}
+                  defaultValue=""
+                >
+                  <option value="" disabled>
+                    削除する設定を選ぶ...
+                  </option>
+                  {favoriteEnvironments.map((env) => (
+                    <option key={env.id} value={env.id}>
+                      {env.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
 
           <div className="space-y-2">
             <div className="relative">
@@ -198,7 +325,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   onClick={() => onTogglePoints(!showPoints)}
                   className={`w-full px-2 py-1.5 rounded-md text-[10px] font-medium border transition-colors ${showPoints ? "bg-blue-50 border-blue-200 text-blue-700" : "bg-white border-gray-300 text-gray-600"}`}
                 >
-                  開始/終了点
+                  開始/終了点(全体)
                 </button>
               </div>
             </div>
@@ -206,7 +333,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             {/* Zoom Control */}
             <div className="flex items-center space-x-2 bg-gray-50 p-1.5 rounded-md border border-gray-200">
               <button
-                onClick={() => onScaleChange(Math.max(scale - 0.1, 0.2))}
+                onClick={() => onScaleChange(scale / 1.1)}
                 className="p-1 text-gray-400 hover:text-gray-600 hover:bg-white rounded transition-colors"
               >
                 <svg
@@ -227,7 +354,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 ズーム: {Math.round(scale * 100)}%
               </div>
               <button
-                onClick={() => onScaleChange(Math.min(scale + 0.1, 10.0))}
+                onClick={() => onScaleChange(scale * 1.1)}
                 className="p-1 text-gray-400 hover:text-gray-600 hover:bg-white rounded transition-colors"
               >
                 <svg
@@ -285,6 +412,62 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 背景画像をクリア
               </button>
             </div>
+
+            {/* Background Image Gallery */}
+            {backgroundsList.length > 0 && (
+              <div className="mt-2 text-xs">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-gray-500 font-medium">
+                    履歴から選ぶ
+                  </span>
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  {backgroundsList.map((bg) => (
+                    <div
+                      key={bg.id}
+                      className="relative group cursor-pointer aspect-square rounded overflow-hidden border border-gray-200 hover:border-blue-400 hover:shadow-sm"
+                      onClick={() =>
+                        onBackgroundImageSelect &&
+                        onBackgroundImageSelect(`${SERVER_URL}${bg.url}`)
+                      }
+                    >
+                      <img
+                        src={`${SERVER_URL}${bg.url}`}
+                        alt="Background Thumbnail"
+                        className="object-cover w-full h-full"
+                      />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (
+                            onDeleteBackground &&
+                            window.confirm("この背景画像を削除しますか？")
+                          ) {
+                            onDeleteBackground(bg.id);
+                          }
+                        }}
+                        className="absolute top-0 right-0 p-0.5 bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="削除"
+                      >
+                        <svg
+                          className="w-3 h-3"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -409,6 +592,31 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 </div>
               </div>
 
+              {/* Action-specific Points Toggle */}
+              {onToggleCommandPoints && (
+                <div>
+                  <div className="flex justify-between mb-1 items-center">
+                    <label className="text-xs font-medium text-gray-600">
+                      開始/終了点 (このアクションのみ)
+                    </label>
+                  </div>
+                  <div className="flex bg-gray-100 p-1 rounded-md">
+                    <button
+                      onClick={() =>
+                        onToggleCommandPoints(
+                          !(selectedCommandShowPoints ?? showPoints),
+                        )
+                      }
+                      className={`w-full px-2 py-1.5 rounded-md text-[10px] font-medium border transition-colors ${(selectedCommandShowPoints ?? showPoints) ? "bg-purple-50 border-purple-200 text-purple-700" : "bg-white border-gray-300 text-gray-600"}`}
+                    >
+                      {(selectedCommandShowPoints ?? showPoints)
+                        ? "表示中"
+                        : "非表示"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Duration */}
               <div>
                 <div className="flex justify-between mb-1 items-center">
@@ -420,8 +628,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                       type="number"
                       min="0.1"
                       max="5.0"
-                      step="0.1"
-                      value={Number(duration).toFixed(1)}
+                      step="0.05"
+                      value={Number(duration).toFixed(2)}
                       onChange={(e) =>
                         onDurationChange(
                           Math.max(
@@ -430,16 +638,32 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                           ),
                         )
                       }
-                      className="w-12 text-xs font-mono bg-gray-100 px-1 py-0.5 rounded border border-transparent focus:border-blue-500 focus:bg-white text-right outline-none transition-colors"
+                      className="w-16 text-xs font-mono bg-gray-100 px-1 py-0.5 rounded border border-transparent focus:border-blue-500 focus:bg-white text-right outline-none transition-colors"
                     />
                     <span className="text-xs text-gray-500">秒</span>
                   </div>
                 </div>
+                {/* --- 新規追加: 時間プリセット --- */}
+                <div className="flex space-x-2 mb-2">
+                  <button
+                    onClick={() => onDurationChange(0.2)}
+                    className="flex-1 py-1 px-2 border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded text-[10px] font-medium transition-colors"
+                  >
+                    0.2秒 (ゲージなし)
+                  </button>
+                  <button
+                    onClick={() => onDurationChange(0.42)}
+                    className="flex-1 py-1 px-2 border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded text-[10px] font-medium transition-colors"
+                  >
+                    0.42秒 (ゲージあり)
+                  </button>
+                </div>
+                {/* ---------------------------------- */}
                 <input
                   type="range"
                   min="0.1"
                   max="5.0"
-                  step="0.1"
+                  step="0.05"
                   value={duration}
                   onChange={(e) => onDurationChange(parseFloat(e.target.value))}
                   className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
@@ -484,6 +708,87 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                     </div>
                   </div>
                 </div>
+
+                {/* --- 新規追加: 回転方向の微調整ボタン --- */}
+                <div className="flex justify-between items-center mb-1 mt-1">
+                  <button
+                    onPointerDown={() => startPress(-1)}
+                    onPointerUp={stopPress}
+                    onPointerLeave={stopPress}
+                    onContextMenu={(e) => e.preventDefault()}
+                    className="p-1 px-2 flex items-center bg-white border border-gray-300 rounded hover:bg-gray-50 active:bg-gray-100 text-[10px] text-gray-600 transition-colors shadow-sm select-none"
+                    title="左回り (-1)"
+                  >
+                    <svg
+                      className="w-3.5 h-3.5 mr-1 text-purple-500"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+                      />
+                    </svg>
+                    -1
+                  </button>
+                  <button
+                    onPointerDown={() => startPress(1)}
+                    onPointerUp={stopPress}
+                    onPointerLeave={stopPress}
+                    onContextMenu={(e) => e.preventDefault()}
+                    className="p-1 px-2 flex items-center bg-white border border-gray-300 rounded hover:bg-gray-50 active:bg-gray-100 text-[10px] text-gray-600 transition-colors shadow-sm select-none"
+                    title="右回り (+1)"
+                  >
+                    +1
+                    <svg
+                      className="w-3.5 h-3.5 ml-1 text-purple-500"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6"
+                      />
+                    </svg>
+                  </button>
+                </div>
+                {/* ------------------------------------- */}
+
+                {/* --- 新規追加: 角度プリセット --- */}
+                <div className="grid grid-cols-4 gap-1 mb-2">
+                  <button
+                    onClick={() => onAngleChange(256)}
+                    className="py-1 border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded text-[10px] font-medium flex items-center justify-center transition-colors"
+                  >
+                    ↑ (256)
+                  </button>
+                  <button
+                    onClick={() => onAngleChange(768)}
+                    className="py-1 border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded text-[10px] font-medium flex items-center justify-center transition-colors"
+                  >
+                    ↓ (768)
+                  </button>
+                  <button
+                    onClick={() => onAngleChange(0)}
+                    className="py-1 border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded text-[10px] font-medium flex items-center justify-center transition-colors"
+                  >
+                    ← (0)
+                  </button>
+                  <button
+                    onClick={() => onAngleChange(512)}
+                    className="py-1 border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded text-[10px] font-medium flex items-center justify-center transition-colors"
+                  >
+                    → (512)
+                  </button>
+                </div>
+                {/* ---------------------------------- */}
+
                 <input
                   type="range"
                   min="0"
@@ -622,7 +927,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 <input
                   type="number"
                   min="0.1"
-                  step="0.1"
+                  step="0.05"
                   value={selectedStrokeWait ?? waitDuration}
                   onChange={(e) => {
                     // If override is handled by selectedStrokeWait, we use onSelectedStrokeWaitChange
@@ -720,7 +1025,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
             />
           </svg>
-          コマンド書き出し
+          このコマンドを書き出す
         </button>
       </div>
     </div>
