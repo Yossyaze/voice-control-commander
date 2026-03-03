@@ -52,6 +52,7 @@ interface ControlPanelProps {
   selectionType?: "stroke" | "wait";
   onDeleteSelectedAction?: () => void;
   onFlipAngle?: () => void;
+  onFlip?: (direction: "horizontal" | "vertical") => void;
 
   // Favorites Feature
   favoriteEnvironments?: import("../api").EnvironmentSettings[];
@@ -103,6 +104,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   selectionType = "stroke",
   onDeleteSelectedAction,
   onFlipAngle,
+  onFlip,
   favoriteEnvironments = [],
   onSaveEnvironment,
   onLoadEnvironment,
@@ -798,6 +800,48 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   onChange={(e) => onAngleChange(parseFloat(e.target.value))}
                   className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
                 />
+                {/* 左右反転 / 上下反転 ボタン */}
+                <div className="flex space-x-2 mt-2">
+                  <button
+                    onClick={() => onFlip?.("horizontal")}
+                    className="w-full flex items-center justify-center py-2 border border-blue-200 shadow-sm text-[10px] font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
+                  >
+                    <svg
+                      className="w-3.5 h-3.5 mr-1"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                      />
+                    </svg>
+                    左右反転
+                  </button>
+                  <button
+                    onClick={() => onFlip?.("vertical")}
+                    className="w-full flex items-center justify-center py-2 border border-blue-200 shadow-sm text-[10px] font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
+                  >
+                    <svg
+                      className="w-3.5 h-3.5 mr-1"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
+                      />
+                    </svg>
+                    上下反転
+                  </button>
+                </div>
+
                 {onFlipAngle && (
                   <button
                     onClick={onFlipAngle}

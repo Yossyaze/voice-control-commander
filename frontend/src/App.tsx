@@ -1277,6 +1277,48 @@ function App() {
     );
   };
 
+  const handleFlip = (direction: "horizontal" | "vertical") => {
+    if (!activeCommandId) return;
+
+    saveToHistory();
+    setCommands((prev) =>
+      prev.map((cmd) => {
+        if (cmd.id !== activeCommandId) return cmd;
+
+        const indicesToModify =
+          selectedStrokeIndex !== null
+            ? [selectedStrokeIndex]
+            : cmd.strokes.map((_, i) => i);
+
+        const newStrokes = cmd.strokes.map((stroke, index) => {
+          if (!indicesToModify.includes(index) || stroke.length === 0)
+            return stroke;
+
+          let minX = Infinity,
+            maxX = -Infinity,
+            minY = Infinity,
+            maxY = -Infinity;
+          for (const p of stroke) {
+            if (p.x < minX) minX = p.x;
+            if (p.x > maxX) maxX = p.x;
+            if (p.y < minY) minY = p.y;
+            if (p.y > maxY) maxY = p.y;
+          }
+          const centerX = (minX + maxX) / 2;
+          const centerY = (minY + maxY) / 2;
+
+          return stroke.map((p) => ({
+            x: direction === "horizontal" ? centerX - (p.x - centerX) : p.x,
+            y: direction === "vertical" ? centerY - (p.y - centerY) : p.y,
+          }));
+        });
+
+        const legacyPoints = newStrokes.length > 0 ? newStrokes[0] : [];
+        return { ...cmd, strokes: newStrokes, points: legacyPoints };
+      }),
+    );
+  };
+
   const currentAngle = useMemo(() => {
     const points = getSelectedStrokePoints();
     return points ? calculateAngle(points) : 0;
@@ -2490,6 +2532,7 @@ function App() {
           }}
           onCurve={handleCurve}
           onStraight={handleMakeStraight}
+          onFlip={handleFlip}
           absoluteX={currentHeadX}
           absoluteY={currentHeadY}
           isActionSelected={selectedStrokeIndex !== null}
