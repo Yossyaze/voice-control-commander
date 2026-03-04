@@ -364,14 +364,34 @@ const Canvas: React.FC<CanvasProps> = ({
   ]);
 
   const getLogicalPosition = (
-    e: React.PointerEvent | React.MouseEvent<HTMLDivElement>,
+    e:
+      | React.PointerEvent
+      | React.MouseEvent<HTMLDivElement>
+      | React.TouchEvent<HTMLDivElement>,
   ) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return { x: 0, y: 0 };
+
+    let clientX = 0;
+    let clientY = 0;
+
+    if ("touches" in e) {
+      if (e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+      } else if (e.changedTouches.length > 0) {
+        clientX = e.changedTouches[0].clientX;
+        clientY = e.changedTouches[0].clientY;
+      }
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+
     // `rect.left` and `rect.width` now reflect the fully scaled size explicitly
     // Coordinate within the element, scaled back down to the 1.0 (unscaled) logical coordinate size
-    const x = ((e.clientX - rect.left) / rect.width) * width;
-    const y = ((e.clientY - rect.top) / rect.height) * height;
+    const x = ((clientX - rect.left) / rect.width) * width;
+    const y = ((clientY - rect.top) / rect.height) * height;
     return { x, y };
   };
 
@@ -429,7 +449,10 @@ const Canvas: React.FC<CanvasProps> = ({
     return false;
   };
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleMouseDown = (
+    e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>,
+  ) => {
+    if ("touches" in e && e.touches.length !== 1) return;
     if (!onPathDrag) return;
     const pos = getLogicalPosition(e);
 
@@ -475,7 +498,10 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleMouseMove = (
+    e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>,
+  ) => {
+    if ("touches" in e && e.touches.length !== 1) return;
     const pos = getLogicalPosition(e);
 
     if (dragState.targetId && dragState.dragType && onPathDrag) {
@@ -561,9 +587,15 @@ const Canvas: React.FC<CanvasProps> = ({
     });
   };
 
-  const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleCanvasClick = (
+    e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>,
+  ) => {
     // Ignore click if we were dragging
-    if (dragState.isDragging) return;
+    if (dragState.isDragging || wasDraggingRef.current) {
+      wasDraggingRef.current = false;
+      return;
+    }
+    wasDraggingRef.current = false;
 
     if (paths.length === 0) return;
 
@@ -665,6 +697,10 @@ const Canvas: React.FC<CanvasProps> = ({
     onMouseUp: handleMouseUp,
     onMouseLeave: handleMouseUp,
     onClick: handleCanvasClick,
+    onTouchStart: handleMouseDown,
+    onTouchMove: handleMouseMove,
+    onTouchEnd: handleMouseUp,
+    onTouchCancel: handleMouseUp,
   };
 
   return (

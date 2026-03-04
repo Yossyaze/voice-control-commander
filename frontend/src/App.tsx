@@ -1950,7 +1950,7 @@ function App() {
     [],
   );
 
-  // Handle pinch-to-zoom
+  // Handle pinch-to-zoom and two-finger pan
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -1964,15 +1964,96 @@ function App() {
         // スケール感度の調整
         const delta = -e.deltaY * 0.01;
         // 指数関数的なズームに変更: e^delta を掛けることでどの倍率でも同じ変化量に感じる
-        handleScaleChange((prev) => prev * Math.exp(delta));
+        handleScaleChange(
+          (prev) => prev * Math.exp(delta),
+          e.clientX,
+          e.clientY,
+        );
+      }
+    };
+
+    let initialPinchDistance: number | null = null;
+    let lastPanCenter: { x: number; y: number } | null = null;
+
+    const getDistance = (touches: TouchList) => {
+      return Math.sqrt(
+        Math.pow(touches[0].clientX - touches[1].clientX, 2) +
+          Math.pow(touches[0].clientY - touches[1].clientY, 2),
+      );
+    };
+
+    const getCenter = (touches: TouchList) => {
+      return {
+        x: (touches[0].clientX + touches[1].clientX) / 2,
+        y: (touches[0].clientY + touches[1].clientY) / 2,
+      };
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        e.preventDefault(); // Prevent default browser zoom/pan
+        initialPinchDistance = getDistance(e.touches);
+        lastPanCenter = getCenter(e.touches);
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (
+        e.touches.length === 2 &&
+        initialPinchDistance !== null &&
+        lastPanCenter !== null
+      ) {
+        e.preventDefault();
+
+        const currentDistance = getDistance(e.touches);
+        const currentCenter = getCenter(e.touches);
+
+        // 1. Zoom
+        if (initialPinchDistance > 0) {
+          const ratio = currentDistance / initialPinchDistance;
+          handleScaleChange(
+            (prev) => prev * ratio,
+            currentCenter.x,
+            currentCenter.y,
+          );
+        }
+        initialPinchDistance = currentDistance; // Incremental update
+
+        // 2. Pan
+        const dx = currentCenter.x - lastPanCenter.x;
+        const dy = currentCenter.y - lastPanCenter.y;
+
+        container.scrollLeft -= dx;
+        container.scrollTop -= dy;
+
+        lastPanCenter = currentCenter;
+      }
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) {
+        initialPinchDistance = null;
+        lastPanCenter = null;
       }
     };
 
     // Need non-passive listener to prevent default browser zoom
     container.addEventListener("wheel", handleWheel, { passive: false });
+    container.addEventListener("touchstart", handleTouchStart, {
+      passive: false,
+    });
+    container.addEventListener("touchmove", handleTouchMove, {
+      passive: false,
+    });
+    container.addEventListener("touchend", handleTouchEnd);
+    container.addEventListener("touchcancel", handleTouchEnd);
 
     return () => {
       container.removeEventListener("wheel", handleWheel);
+      container.removeEventListener("touchstart", handleTouchStart);
+      container.removeEventListener("touchmove", handleTouchMove);
+      container.removeEventListener("touchend", handleTouchEnd);
+      container.removeEventListener("touchcancel", handleTouchEnd);
     };
   }, [handleScaleChange]);
 
