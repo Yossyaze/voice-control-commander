@@ -7,9 +7,8 @@ import {
   type Command,
   type Point,
   parseFile,
+  exportMerged,
   type EnvironmentSettings,
-  API_BASE_URL,
-  SERVER_URL,
   fetchProjects,
   loadProject,
   createProject,
@@ -1524,22 +1523,15 @@ function App() {
       );
       return {
         name: cmd.name,
-        points: [],
+        points: [] as Point[],
         strokes: cmd.strokes,
         stroke_waits: strokeWaits,
       };
     });
 
     try {
-      const response = await fetch(`${API_BASE_URL}/export_merged`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commands: commandsToExport }),
-      });
-
-      if (!response.ok) throw new Error("Export failed");
-      const result = await response.json();
-      const filename = result.filename || "all_commands.voicecontrolcom";
+      const binaryContent = exportMerged(commandsToExport);
+      const filename = "all_commands.voicecontrolcom";
 
       // @ts-expect-error showSaveFilePicker は型定義にない
       if (window.showSaveFilePicker) {
@@ -1554,16 +1546,12 @@ function App() {
           ],
         });
         const writable = await handle.createWritable();
-        const binaryContent = Uint8Array.from(atob(result.content), (c) =>
-          c.charCodeAt(0),
-        );
         await writable.write(binaryContent);
         await writable.close();
       } else {
-        const blob = new Blob(
-          [Uint8Array.from(atob(result.content), (c) => c.charCodeAt(0))],
-          { type: "application/octet-stream" },
-        );
+        const blob = new Blob([new Uint8Array(binaryContent)], {
+          type: "application/octet-stream",
+        });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
@@ -1603,7 +1591,7 @@ function App() {
 
         return {
           name: cmd.name,
-          points: [],
+          points: [] as Point[],
           strokes: cmd.strokes,
           stroke_waits: strokeWaits,
         };
@@ -1613,14 +1601,7 @@ function App() {
     if (commandsToExport.length === 0) return;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/export_merged`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commands: commandsToExport }),
-      });
-
-      if (!response.ok) throw new Error("Export failed");
-      const result = await response.json();
+      const binaryContent = exportMerged(commandsToExport);
 
       let filename =
         commandsToExport.length === 1
@@ -1631,10 +1612,10 @@ function App() {
         filename += ".voicecontrolcom";
       }
 
-      // Save file logic
-      // @ts-expect-error showSaveFilePicker is not in standard DOM types
+      // ファイル保存ロジック
+      // @ts-expect-error showSaveFilePicker は型定義にない
       if (typeof window.showSaveFilePicker === "function") {
-        // @ts-expect-error showSaveFilePicker is not in standard DOM types
+        // @ts-expect-error showSaveFilePicker は型定義にない
         const handle = await window.showSaveFilePicker({
           suggestedName: filename,
           types: [
@@ -1645,17 +1626,13 @@ function App() {
           ],
         });
         const writable = await handle.createWritable();
-        const binaryContent = Uint8Array.from(atob(result.content), (c) =>
-          c.charCodeAt(0),
-        );
         await writable.write(binaryContent);
         await writable.close();
       } else {
-        // Fallback
-        const blob = new Blob(
-          [Uint8Array.from(atob(result.content), (c) => c.charCodeAt(0))],
-          { type: "application/octet-stream" },
-        );
+        // フォールバック
+        const blob = new Blob([new Uint8Array(binaryContent)], {
+          type: "application/octet-stream",
+        });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
@@ -1946,13 +1923,11 @@ function App() {
   const handleBackgroundImageUpload = async (file: File) => {
     try {
       const bgImage = await uploadBackground(file);
-      const imageUrl = `${SERVER_URL}${bgImage.url}`;
-      setBackgroundImage(imageUrl);
+      // LocalStorage 版では url が Data URL なのでそのまま使用
+      setBackgroundImage(bgImage.url);
 
-      // Update backgrounds list
+      // 背景画像リストを更新
       setBackgroundsList((prev) => [bgImage, ...prev]);
-
-      // Device detection logic (simplified for brevity)
     } catch (err) {
       console.error("Failed to upload background:", err);
       alert("背景画像のアップロードに失敗しました。");
