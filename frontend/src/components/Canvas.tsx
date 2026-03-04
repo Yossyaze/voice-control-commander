@@ -131,6 +131,12 @@ const Canvas: React.FC<CanvasProps> = ({
       } else {
         ctx.fillStyle = "#f3f4f6"; // gray-100
         ctx.fillRect(0, 0, width, height);
+
+        // 背景画像がない場合、枠線を描画する
+        ctx.strokeStyle = "#9ca3af"; // gray-400
+        ctx.lineWidth = 1;
+        ctx.strokeRect(0, 0, width, height);
+
         drawGridAndPaths();
       }
     };

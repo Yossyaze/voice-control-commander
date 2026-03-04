@@ -598,7 +598,10 @@ function App() {
             }
           }
         }
-        setActiveCommandId(null);
+        // 読み込んだコマンドの先頭を選択
+        setActiveCommandId(
+          data.commands.length > 0 ? data.commands[0].id : null,
+        );
         // 履歴をリセット
         setPastLevels([]);
         setFutureLevels([]);
@@ -697,7 +700,7 @@ function App() {
       activeCommandId &&
       !previousState.find((c) => c.id === activeCommandId)
     ) {
-      setActiveCommandId(null);
+      setActiveCommandId(previousState.length > 0 ? previousState[0].id : null);
       setSelectedStrokeIndex(null);
     }
   }, [pastLevels, commands, activeCommandId]);
@@ -1685,6 +1688,65 @@ function App() {
     }
   };
 
+  // 選択中のコマンドを書き出す（設定パネルのボタン用）
+  const handleExportSelected = async () => {
+    if (!activeCommandId) return;
+    const cmd = commands.find((c) => c.id === activeCommandId);
+    if (!cmd) return;
+
+    const strokeWaits = cmd.strokes.map(
+      (_, i) => cmd.strokeMetadata?.[i]?.waitAfter ?? cmd.waitDuration ?? 0.2,
+    );
+
+    const commandToExport = {
+      name: cmd.name,
+      points: [] as Point[],
+      strokes: cmd.strokes,
+      stroke_waits: strokeWaits,
+    };
+
+    try {
+      const binaryContent = exportMerged([commandToExport]);
+      let filename = cmd.name;
+      if (!filename.toLowerCase().endsWith(exportExtension)) {
+        filename += exportExtension;
+      }
+
+      // @ts-expect-error showSaveFilePicker は型定義にない
+      if (typeof window.showSaveFilePicker === "function") {
+        // @ts-expect-error showSaveFilePicker は型定義にない
+        const handle = await window.showSaveFilePicker({
+          suggestedName: filename,
+          types: [
+            {
+              description: "Apple Voice Control Command",
+              accept: { "application/octet-stream": [exportExtension] },
+            },
+          ],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(binaryContent);
+        await writable.close();
+      } else {
+        const blob = new Blob([new Uint8Array(binaryContent)], {
+          type: "application/octet-stream",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+    } catch (error: unknown) {
+      console.error("Export Error:", error);
+      const msg = error instanceof Error ? error.message : String(error);
+      alert(`エクスポートに失敗しました: ${msg}`);
+    }
+  };
+
   // チェックしたコマンドを書き出す
   const handleBatchExport = async () => {
     const targetIds =
@@ -1779,7 +1841,9 @@ function App() {
     // Clear selection
     setCheckedCommandIds(new Set());
     if (activeCommandId && checkedCommandIds.has(activeCommandId)) {
-      setActiveCommandId(null);
+      // 削除後の残りコマンドから先頭を選択
+      const remaining = commands.filter((c) => !checkedCommandIds.has(c.id));
+      setActiveCommandId(remaining.length > 0 ? remaining[0].id : null);
       setSelectedStrokeIndex(null);
     }
   };
@@ -2210,7 +2274,19 @@ function App() {
           onSelectCommand={setActiveCommandId}
           onDeleteCommand={(id) => {
             saveToHistory();
-            setCommands((prev) => prev.filter((c) => c.id !== id));
+            const idx = commands.findIndex((c) => c.id === id);
+            const newCommands = commands.filter((c) => c.id !== id);
+            setCommands(newCommands);
+            // 削除したのが選択中のコマンドなら次を選択
+            if (activeCommandId === id) {
+              if (newCommands.length > 0) {
+                const nextIdx = Math.min(idx, newCommands.length - 1);
+                setActiveCommandId(newCommands[nextIdx].id);
+              } else {
+                setActiveCommandId(null);
+              }
+              setSelectedStrokeIndex(null);
+            }
           }}
           onDuplicateCommand={handleDuplicateCommand}
           onToggleVisibility={(id) => {
@@ -2578,7 +2654,7 @@ function App() {
             if (dx !== 0) handleNudge("x", dx);
             if (dy !== 0) handleNudge("y", dy);
           }}
-          onExport={handleBatchExport}
+          onExport={handleExportSelected}
           onBackgroundImageUpload={handleBackgroundImageUpload}
           onBackgroundImageSelect={(url) => setBackgroundImage(url)}
           onClearBackgroundImage={handleClearBackgroundImage}

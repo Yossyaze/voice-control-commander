@@ -1,11 +1,11 @@
 ---
-description: Voice Control Commander アプリケーション（バックエンドとフロントエンド）を起動する手順
+description: Voice Control Commander アプリケーション（フロントエンドのみ）を起動する手順
 ---
 
-1. バックエンドサーバーを起動します。プロジェクトルートで仮想環境の Python を使用します。
-   // turbo
-2. Run `backend/venv/bin/python backend/main.py` in `/Users/kasugaiakira/Desktop/voice-control-commander`
+> **注意**: バックエンド (`backend/`) は現在使用されていません。
+> すべての処理（plist 解析・エクスポート・プロジェクト管理）はフロントエンド内で完結しています。
+> バックエンドのコードはリファレンス用として保持されていますが、起動する必要はありません。
 
-3. フロントエンドサーバーを起動します。`frontend` ディレクトリで実行する必要があります。
+1. フロントエンド開発サーバーを起動します。`frontend` ディレクトリで実行します。
    // turbo
-4. Run `npm run dev` in `/Users/kasugaiakira/Desktop/voice-control-commander/frontend`
+2. Run `npm run dev` in `/Users/kasugaiakira/Desktop/voice-control-commander/frontend`
