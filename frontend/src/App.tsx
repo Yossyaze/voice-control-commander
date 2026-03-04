@@ -13,6 +13,8 @@ import {
   loadProject,
   createProject,
   updateProject,
+  renameProject,
+  deleteProject,
   type ProjectSummary,
   type BackgroundImage,
   fetchBackgrounds,
@@ -499,12 +501,27 @@ function App() {
       .catch((err) => console.error("Failed to load projects list", err));
   }, []);
 
+  // 現在の背景画像に対応する IndexedDB の ID を取得するヘルパー
+  const getCurrentBackgroundImageId = (): string | null => {
+    if (!backgroundImage) return null;
+    const found = backgroundsList.find((bg) => bg.url === backgroundImage);
+    return found?.id ?? null;
+  };
+
+  // プロジェクトの設定を組み立てるヘルパー
+  const buildProjectSettings = () => ({
+    selectedModelId,
+    orientation,
+    scale,
+    backgroundImageId: getCurrentBackgroundImageId(),
+  });
+
   const handleCreateProject = async (name: string) => {
     try {
       const data = await createProject({
         name,
         commands,
-        settings: { selectedModelId, orientation, scale, backgroundImage },
+        settings: buildProjectSettings(),
       });
       if (data.id) {
         setCurrentProjectId(data.id);
@@ -533,7 +550,7 @@ function App() {
       await updateProject(currentProjectId, {
         name: currentProjectName,
         commands,
-        settings: { selectedModelId, orientation, scale, backgroundImage },
+        settings: buildProjectSettings(),
       });
       alert("プロジェクトを上書き保存しました");
     } catch (err) {
@@ -543,6 +560,13 @@ function App() {
   };
 
   const handleLoadProject = async (id: string) => {
+    // 未保存の変更がある場合は確認ダイアログを表示
+    if (commands.length > 0) {
+      const confirmed = window.confirm(
+        "現在の編集内容は保存されていません。\nプロジェクトを切り替えますか？",
+      );
+      if (!confirmed) return;
+    }
     try {
       const data = await loadProject(id);
       if (data.id) {
@@ -557,14 +581,72 @@ function App() {
               data.settings.orientation as "portrait" | "landscape",
             );
           if (data.settings.scale) setScale(data.settings.scale as number);
-          if (data.settings.backgroundImage !== undefined)
-            setBackgroundImage(data.settings.backgroundImage as string | null);
+
+          // 背景画像を IndexedDB のIDから復元
+          const bgId = data.settings.backgroundImageId as string | null;
+          if (bgId) {
+            const matchedBg = backgroundsList.find((bg) => bg.id === bgId);
+            setBackgroundImage(matchedBg?.url ?? null);
+          } else {
+            // 旧形式の backgroundImage（Data URL）もフォールバック対応
+            if (data.settings.backgroundImage !== undefined) {
+              setBackgroundImage(
+                data.settings.backgroundImage as string | null,
+              );
+            } else {
+              setBackgroundImage(null);
+            }
+          }
         }
         setActiveCommandId(null);
+        // 履歴をリセット
+        setPastLevels([]);
+        setFutureLevels([]);
       }
     } catch (err) {
       console.error(err);
       alert("読み込みに失敗しました");
+    }
+  };
+
+  const handleDeleteProject = async (id: string) => {
+    const project = projectsList.find((p) => p.id === id);
+    if (!project) return;
+    const confirmed = window.confirm(
+      `プロジェクト「${project.name}」を削除しますか？\nこの操作は元に戻せません。`,
+    );
+    if (!confirmed) return;
+    try {
+      await deleteProject(id);
+      setProjectsList((prev) => prev.filter((p) => p.id !== id));
+      // 削除したのが現在のプロジェクトなら未保存状態にリセット
+      if (currentProjectId === id) {
+        setCurrentProjectId(null);
+        setCurrentProjectName("名称未設定プロジェクト");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("プロジェクトの削除に失敗しました");
+    }
+  };
+
+  const handleRenameProject = async (id: string) => {
+    const project = projectsList.find((p) => p.id === id);
+    if (!project) return;
+    const newName = window.prompt("新しいプロジェクト名:", project.name);
+    if (!newName || !newName.trim() || newName.trim() === project.name) return;
+    try {
+      await renameProject(id, newName.trim());
+      setProjectsList((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, name: newName.trim() } : p)),
+      );
+      // 現在のプロジェクトなら名前も更新
+      if (currentProjectId === id) {
+        setCurrentProjectName(newName.trim());
+      }
+    } catch (err) {
+      console.error(err);
+      alert("プロジェクト名の変更に失敗しました");
     }
   };
 
@@ -663,6 +745,14 @@ function App() {
   const [showPoints, setShowPoints] = useState<boolean>(() =>
     loadState<boolean>("showPoints", true),
   );
+
+  // --- 書き出し拡張子設定 ---
+  const [exportExtension, setExportExtension] = useState<string>(() =>
+    loadState<string>("exportExtension", ".voicecontrolcom"),
+  );
+  useEffect(() => {
+    saveState("exportExtension", exportExtension);
+  }, [exportExtension]);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState<boolean>(() =>
     loadState<boolean>("isLeftSidebarOpen", true),
@@ -677,7 +767,20 @@ function App() {
     EnvironmentSettings[]
   >(() => loadState<EnvironmentSettings[]>("favoriteEnvironments", []));
 
+  // 名前の重複チェック（自分自身は除外可能）
+  const isEnvironmentNameDuplicate = (name: string, excludeId?: string) => {
+    return favoriteEnvironments.some(
+      (env) => env.name === name && env.id !== excludeId,
+    );
+  };
+
   const handleSaveEnvironment = (name: string) => {
+    if (isEnvironmentNameDuplicate(name)) {
+      alert(
+        `「${name}」は既に使われている名前です。別の名前を指定してください。`,
+      );
+      return;
+    }
     const newEnv: EnvironmentSettings = {
       id: crypto.randomUUID
         ? crypto.randomUUID()
@@ -685,10 +788,6 @@ function App() {
       name,
       modelId: selectedModelId,
       orientation,
-      scale,
-      showGrid,
-      showPoints,
-      backgroundImage,
     };
     setFavoriteEnvironments((prev) => [...prev, newEnv]);
   };
@@ -696,10 +795,28 @@ function App() {
   const handleLoadEnvironment = (env: EnvironmentSettings) => {
     setSelectedModelId(env.modelId);
     setOrientation(env.orientation);
-    setScale(env.scale);
-    setShowGrid(env.showGrid);
-    setShowPoints(env.showPoints);
-    setBackgroundImage(env.backgroundImage);
+  };
+
+  // お気に入りの名前を変更する
+  const handleRenameEnvironment = (id: string, newName: string) => {
+    if (isEnvironmentNameDuplicate(newName, id)) {
+      alert(
+        `「${newName}」は既に使われている名前です。別の名前を指定してください。`,
+      );
+      return;
+    }
+    setFavoriteEnvironments((prev) =>
+      prev.map((env) => (env.id === id ? { ...env, name: newName } : env)),
+    );
+  };
+
+  // 既存のお気に入りを現在の設定で上書き保存する
+  const handleOverwriteEnvironment = (id: string) => {
+    setFavoriteEnvironments((prev) =>
+      prev.map((env) =>
+        env.id === id ? { ...env, modelId: selectedModelId, orientation } : env,
+      ),
+    );
   };
 
   const handleDeleteEnvironment = (id: string) => {
@@ -1531,7 +1648,7 @@ function App() {
 
     try {
       const binaryContent = exportMerged(commandsToExport);
-      const filename = "all_commands.voicecontrolcom";
+      const filename = `all_commands${exportExtension}`;
 
       // @ts-expect-error showSaveFilePicker は型定義にない
       if (window.showSaveFilePicker) {
@@ -1541,7 +1658,7 @@ function App() {
           types: [
             {
               description: "Apple Voice Control Commands",
-              accept: { "application/octet-stream": [".voicecontrolcom"] },
+              accept: { "application/octet-stream": [exportExtension] },
             },
           ],
         });
@@ -1608,8 +1725,8 @@ function App() {
           ? commandsToExport[0]!.name
           : "ExportedCommands";
 
-      if (!filename.toLowerCase().endsWith(".voicecontrolcom")) {
-        filename += ".voicecontrolcom";
+      if (!filename.toLowerCase().endsWith(exportExtension)) {
+        filename += exportExtension;
       }
 
       // ファイル保存ロジック
@@ -1621,7 +1738,7 @@ function App() {
           types: [
             {
               description: "Apple Voice Control Command",
-              accept: { "application/octet-stream": [".voicecontrolcom"] },
+              accept: { "application/octet-stream": [exportExtension] },
             },
           ],
         });
@@ -1923,7 +2040,7 @@ function App() {
   const handleBackgroundImageUpload = async (file: File) => {
     try {
       const bgImage = await uploadBackground(file);
-      // LocalStorage 版では url が Data URL なのでそのまま使用
+      // IndexedDB 版では url が Object URL
       setBackgroundImage(bgImage.url);
 
       // 背景画像リストを更新
@@ -1936,12 +2053,21 @@ function App() {
 
   const handleDeleteBackground = async (id: string) => {
     try {
+      // 削除対象の Object URL を特定
+      const deletedBg = backgroundsList.find((bg) => bg.id === id);
+      const deletedUrl = deletedBg?.url;
+
       await deleteBackground(id);
       setBackgroundsList((prev) => prev.filter((bg) => bg.id !== id));
 
-      // If the deleted image was currently selected, clear it
-      if (backgroundImage && backgroundImage.includes(id)) {
+      // 削除した画像が現在選択中なら背景をクリア
+      if (deletedUrl && backgroundImage === deletedUrl) {
         setBackgroundImage(null);
+      }
+
+      // Object URL を解放
+      if (deletedUrl) {
+        URL.revokeObjectURL(deletedUrl);
       }
     } catch (err) {
       console.error("Failed to delete background:", err);
@@ -2125,6 +2251,8 @@ function App() {
           projectsList={projectsList}
           onLoadProject={handleLoadProject}
           onSaveProject={handleSaveProject}
+          onDeleteProject={handleDeleteProject}
+          onRenameProject={handleRenameProject}
         />
         {/* Close button for fullscreen popup mode */}
         {isFullscreen && isLeftSidebarOpen && (
@@ -2531,7 +2659,11 @@ function App() {
           favoriteEnvironments={favoriteEnvironments}
           onSaveEnvironment={handleSaveEnvironment}
           onLoadEnvironment={handleLoadEnvironment}
+          onRenameEnvironment={handleRenameEnvironment}
+          onOverwriteEnvironment={handleOverwriteEnvironment}
           onDeleteEnvironment={handleDeleteEnvironment}
+          exportExtension={exportExtension}
+          onExportExtensionChange={setExportExtension}
         />
         {/* Close button for fullscreen popup mode */}
         {isFullscreen && isRightSidebarOpen && (

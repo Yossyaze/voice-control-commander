@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useCallback } from "react";
-import { type BackgroundImage, SERVER_URL } from "../api";
+import { type BackgroundImage } from "../api";
 
 interface DeviceModel {
   id: string;
@@ -54,11 +54,17 @@ interface ControlPanelProps {
   onFlipAngle?: () => void;
   onFlip?: (direction: "horizontal" | "vertical") => void;
 
-  // Favorites Feature
+  // お気に入り環境設定
   favoriteEnvironments?: import("../api").EnvironmentSettings[];
   onSaveEnvironment?: (name: string) => void;
   onLoadEnvironment?: (env: import("../api").EnvironmentSettings) => void;
+  onRenameEnvironment?: (id: string, newName: string) => void;
+  onOverwriteEnvironment?: (id: string) => void;
   onDeleteEnvironment?: (id: string) => void;
+
+  // 書き出し拡張子
+  exportExtension?: string;
+  onExportExtensionChange?: (ext: string) => void;
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = ({
@@ -108,7 +114,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   favoriteEnvironments = [],
   onSaveEnvironment,
   onLoadEnvironment,
+  onRenameEnvironment,
+  onOverwriteEnvironment,
   onDeleteEnvironment,
+  exportExtension = ".voicecontrolcom",
+  onExportExtensionChange,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -191,71 +201,164 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             環境設定
           </label>
 
-          {/* Favorties Dropdown & Actions */}
+          {/* お気に入り環境設定 */}
           <div className="flex flex-col space-y-2 bg-blue-50/50 p-2 rounded-md border border-blue-100">
-            <div className="flex items-center space-x-2">
-              <select
-                className="flex-1 text-xs border-gray-300 rounded shadow-sm focus:border-blue-500 py-1.5 pl-2 pr-6 bg-white"
-                onChange={(e) => {
-                  if (e.target.value === "") return;
-                  const env = favoriteEnvironments.find(
-                    (env) => env.id === e.target.value,
-                  );
-                  if (env && onLoadEnvironment) onLoadEnvironment(env);
-                  e.target.value = ""; // Reset after load
-                }}
-                defaultValue=""
-              >
-                <option value="" disabled>
-                  🌟 お気に入りを読み込む...
-                </option>
-                {favoriteEnvironments.map((env) => (
-                  <option key={env.id} value={env.id}>
-                    {env.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={() => {
-                  const name = window.prompt(
-                    "現在の環境設定に名前を付けて保存します。",
-                  );
-                  if (name && name.trim() && onSaveEnvironment) {
-                    onSaveEnvironment(name.trim());
-                  }
-                }}
-                className="px-2 py-1.5 bg-blue-500 text-white rounded text-xs font-medium hover:bg-blue-600 transition"
-                title="現在の設定をお気に入りに追加"
-              >
-                保存
-              </button>
-            </div>
+            {/* 新規保存ボタン */}
+            <button
+              onClick={() => {
+                const name = window.prompt(
+                  "現在の環境設定（端末・縦横）に名前を付けて保存します。",
+                );
+                if (name && name.trim() && onSaveEnvironment) {
+                  onSaveEnvironment(name.trim());
+                }
+              }}
+              className="w-full flex items-center justify-center px-2 py-1.5 bg-blue-500 text-white rounded text-xs font-medium hover:bg-blue-600 transition"
+              title="現在の設定をお気に入りに追加"
+            >
+              🌟 現在の設定をお気に入りに保存
+            </button>
 
-            {favoriteEnvironments.length > 0 && (
-              <div className="flex items-center space-x-2 mt-1 relative">
-                <select
-                  className="flex-1 text-[10px] text-red-600 border-red-200 rounded shadow-sm py-1 pl-2 pr-6 bg-white/80"
-                  onChange={(e) => {
-                    if (e.target.value === "") return;
-                    if (window.confirm("このお気に入り設定を削除しますか？")) {
-                      if (onDeleteEnvironment)
-                        onDeleteEnvironment(e.target.value);
-                    }
-                    e.target.value = ""; // Reset
-                  }}
-                  defaultValue=""
-                >
-                  <option value="" disabled>
-                    削除する設定を選ぶ...
-                  </option>
-                  {favoriteEnvironments.map((env) => (
-                    <option key={env.id} value={env.id}>
-                      {env.name}
-                    </option>
-                  ))}
-                </select>
+            {/* お気に入りリスト */}
+            {favoriteEnvironments.length > 0 ? (
+              <div className="space-y-1 max-h-40 overflow-y-auto">
+                {favoriteEnvironments.map((env) => (
+                  <div
+                    key={env.id}
+                    className="flex items-center justify-between bg-white rounded border border-gray-200 px-2 py-1.5 group hover:border-blue-300 transition-colors"
+                  >
+                    {/* 名前と情報 */}
+                    <button
+                      className="flex-1 text-left text-xs text-gray-700 hover:text-blue-600 truncate"
+                      onClick={() =>
+                        onLoadEnvironment && onLoadEnvironment(env)
+                      }
+                      title={`読み込む: ${env.name}`}
+                    >
+                      <span className="font-medium">{env.name}</span>
+                      <span className="text-[9px] text-gray-400 ml-1">
+                        ({env.orientation === "portrait" ? "縦" : "横"})
+                      </span>
+                    </button>
+                    {/* 操作ボタン群 */}
+                    <div className="flex items-center space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-1">
+                      {/* 上書き保存 */}
+                      <button
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              `「${env.name}」を現在の設定で上書きしますか？`,
+                            )
+                          ) {
+                            if (onOverwriteEnvironment)
+                              onOverwriteEnvironment(env.id);
+                          }
+                        }}
+                        className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                        title="現在の設定で上書き保存"
+                      >
+                        <svg
+                          className="w-3 h-3"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                          />
+                        </svg>
+                      </button>
+                      {/* リネーム */}
+                      <button
+                        onClick={() => {
+                          const newName = window.prompt(
+                            "新しい名前を入力してください:",
+                            env.name,
+                          );
+                          if (
+                            newName &&
+                            newName.trim() &&
+                            newName.trim() !== env.name &&
+                            onRenameEnvironment
+                          ) {
+                            onRenameEnvironment(env.id, newName.trim());
+                          }
+                        }}
+                        className="p-1 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-colors"
+                        title="名前を変更"
+                      >
+                        <svg
+                          className="w-3 h-3"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                          />
+                        </svg>
+                      </button>
+                      {/* 削除 */}
+                      <button
+                        onClick={() => {
+                          if (
+                            window.confirm(`「${env.name}」を削除しますか？`)
+                          ) {
+                            if (onDeleteEnvironment)
+                              onDeleteEnvironment(env.id);
+                          }
+                        }}
+                        className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                        title="削除"
+                      >
+                        <svg
+                          className="w-3 h-3"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
+            ) : (
+              <p className="text-[10px] text-gray-400 text-center py-1">
+                まだお気に入りがありません
+              </p>
             )}
+          </div>
+
+          {/* 書き出し拡張子 */}
+          <div className="flex items-center space-x-2 bg-gray-50 p-2 rounded-md border border-gray-200">
+            <label className="text-[10px] text-gray-500 font-medium whitespace-nowrap">
+              拡張子
+            </label>
+            <select
+              className="flex-1 text-xs border-gray-300 rounded shadow-sm focus:border-blue-500 py-1 pl-2 pr-6 bg-white"
+              value={exportExtension}
+              onChange={(e) => onExportExtensionChange?.(e.target.value)}
+            >
+              <option value=".voicecontrolcom">
+                .voicecontrolcom（短縮版）
+              </option>
+              <option value=".voicecontrolcommands">
+                .voicecontrolcommands（正式）
+              </option>
+            </select>
           </div>
 
           <div className="space-y-2">
@@ -430,11 +533,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                       className="relative group cursor-pointer aspect-square rounded overflow-hidden border border-gray-200 hover:border-blue-400 hover:shadow-sm"
                       onClick={() =>
                         onBackgroundImageSelect &&
-                        onBackgroundImageSelect(`${SERVER_URL}${bg.url}`)
+                        onBackgroundImageSelect(bg.url)
                       }
                     >
                       <img
-                        src={`${SERVER_URL}${bg.url}`}
+                        src={bg.url}
                         alt="Background Thumbnail"
                         className="object-cover w-full h-full"
                       />
