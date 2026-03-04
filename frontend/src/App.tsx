@@ -2599,6 +2599,12 @@ function App() {
                 showGrid={showGrid}
                 showPoints={showPoints}
                 onPathDrag={handlePathDrag}
+                onPan={(dx, dy) => {
+                  if (scrollContainerRef.current) {
+                    scrollContainerRef.current.scrollLeft -= dx;
+                    scrollContainerRef.current.scrollTop -= dy;
+                  }
+                }}
                 onSelectCommand={(_, cmdId, pathId) => {
                   let strokeIndex: number | null = null;
                   if (pathId) {

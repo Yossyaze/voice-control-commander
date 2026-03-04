@@ -31,6 +31,7 @@ interface CanvasProps {
     commandId: string,
     pathId?: string,
   ) => void;
+  onPan?: (dx: number, dy: number) => void;
 
   markerPosition?: { x: number; y: number } | null;
   scale?: number;
@@ -58,6 +59,7 @@ const Canvas: React.FC<CanvasProps> = ({
   scale = 1.0,
   connections = [],
   onSelectWait,
+  onPan,
 }) => {
   // Badges hit regions for click handling
   const badgesRef = useRef<
@@ -70,7 +72,7 @@ const Canvas: React.FC<CanvasProps> = ({
   const [dragState, setDragState] = useState<{
     isDragging: boolean;
     targetId: string | null;
-    dragType: "move" | "start" | "end" | null;
+    dragType: "move" | "start" | "end" | "pan" | null;
     lastX: number;
     lastY: number;
     startX: number;
@@ -453,12 +455,12 @@ const Canvas: React.FC<CanvasProps> = ({
     e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>,
   ) => {
     if ("touches" in e && e.touches.length !== 1) return;
-    if (!onPathDrag) return;
+    if (!onPathDrag && !onPan) return;
     const pos = getLogicalPosition(e);
 
     // Check selected path first
     const selectedPath = paths.find((p) => p.isSelected);
-    if (selectedPath) {
+    if (selectedPath && onPathDrag) {
       const isTap =
         selectedPath.points.length === 1 ||
         selectedPath.points.every(
@@ -496,6 +498,19 @@ const Canvas: React.FC<CanvasProps> = ({
         return;
       }
     }
+
+    // Hit nothing, try pan
+    if (onPan) {
+      setDragState({
+        isDragging: false,
+        targetId: null,
+        dragType: "pan",
+        lastX: pos.x,
+        lastY: pos.y,
+        startX: pos.x,
+        startY: pos.y,
+      });
+    }
   };
 
   const handleMouseMove = (
@@ -504,7 +519,7 @@ const Canvas: React.FC<CanvasProps> = ({
     if ("touches" in e && e.touches.length !== 1) return;
     const pos = getLogicalPosition(e);
 
-    if (dragState.targetId && dragState.dragType && onPathDrag) {
+    if (dragState.dragType) {
       // Check if we should start dragging
       if (!dragState.isDragging) {
         const dist = Math.sqrt(
@@ -522,7 +537,15 @@ const Canvas: React.FC<CanvasProps> = ({
       const deltaX = pos.x - dragState.lastX;
       const deltaY = pos.y - dragState.lastY;
 
-      onPathDrag(dragState.targetId, deltaX, deltaY, dragState.dragType);
+      if (dragState.dragType === "pan" && onPan) {
+        onPan(deltaX, deltaY);
+      } else if (
+        dragState.targetId &&
+        onPathDrag &&
+        dragState.dragType !== "pan"
+      ) {
+        onPathDrag(dragState.targetId, deltaX, deltaY, dragState.dragType);
+      }
 
       setDragState((prev) => ({
         ...prev,
@@ -707,7 +730,13 @@ const Canvas: React.FC<CanvasProps> = ({
     <div
       {...handlers}
       className={`touch-none ${
-        dragState.dragType ? "cursor-grabbing" : `cursor-${cursor}`
+        dragState.dragType === "pan"
+          ? "cursor-grabbing"
+          : dragState.dragType
+            ? "cursor-grabbing"
+            : cursor === "default" && onPan
+              ? "cursor-grab"
+              : `cursor-${cursor}`
       } relative bg-gray-50 shadow-inner`}
       style={{
         ...style,
