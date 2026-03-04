@@ -52,6 +52,7 @@ interface SidebarProps {
   projectsList: ProjectSummary[];
   onLoadProject: (id: string) => void;
   onSaveProject: () => void;
+  onSaveAsProject: () => void;
   onDeleteProject: (id: string) => void;
   onRenameProject: (id: string) => void;
 }
@@ -663,6 +664,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
     projectsList,
     onLoadProject,
     onSaveProject,
+    onSaveAsProject,
     onDeleteProject,
     onRenameProject,
   } = props;
@@ -728,9 +730,16 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
             <button
               onClick={onSaveProject}
               className="text-[10px] font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 py-1 rounded transition-colors"
-              title="現在の状態を保存"
+              title="現在の状態を上書き保存"
             >
               💾 保存
+            </button>
+            <button
+              onClick={onSaveAsProject}
+              className="text-[10px] font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded transition-colors"
+              title="名前を付けて新しいプロジェクトとして保存"
+            >
+              📋 別名保存
             </button>
           </div>
         </div>

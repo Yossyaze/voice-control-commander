@@ -559,6 +559,16 @@ function App() {
     }
   };
 
+  // 名前を付けて保存（Save As）: 現在の内容を新しいプロジェクトとしてコピー保存
+  const handleSaveAsProject = async () => {
+    const defaultName = currentProjectName
+      ? `${currentProjectName} のコピー`
+      : "名称未設定プロジェクト";
+    const name = prompt("新しいプロジェクト名を入力してください:", defaultName);
+    if (!name || !name.trim()) return;
+    await handleCreateProject(name.trim());
+  };
+
   const handleLoadProject = async (id: string) => {
     // 未保存の変更がある場合は確認ダイアログを表示
     if (commands.length > 0) {
@@ -2408,6 +2418,7 @@ function App() {
           projectsList={projectsList}
           onLoadProject={handleLoadProject}
           onSaveProject={handleSaveProject}
+          onSaveAsProject={handleSaveAsProject}
           onDeleteProject={handleDeleteProject}
           onRenameProject={handleRenameProject}
         />
