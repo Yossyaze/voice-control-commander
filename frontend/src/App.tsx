@@ -2612,10 +2612,9 @@ function App() {
                 onPathDrag={handlePathDrag}
                 onPan={(dx, dy) => {
                   if (scrollContainerRef.current) {
-                    // dx, dy は Canvas 内部の論理座標（scale適用前）であるため、
-                    // スクロールコンテナ（物理ピクセル）を動かすには scale を掛ける必要がある
-                    scrollContainerRef.current.scrollLeft -= dx * scale;
-                    scrollContainerRef.current.scrollTop -= dy * scale;
+                    // dx, dy は Canvas 側で計算された物理ピクセルの移動量
+                    scrollContainerRef.current.scrollLeft -= dx;
+                    scrollContainerRef.current.scrollTop -= dy;
                   }
                 }}
                 onSelectCommand={(_, cmdId, pathId) => {
