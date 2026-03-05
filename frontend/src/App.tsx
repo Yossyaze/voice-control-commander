@@ -495,6 +495,19 @@ function App() {
   );
   const [projectsList, setProjectsList] = useState<ProjectSummary[]>([]);
 
+  // --- 未保存状態の管理 ---
+  const [savedCommandsJSON, setSavedCommandsJSON] = useState<string>(() =>
+    loadState<string>("savedCommandsJSON", "[]"),
+  );
+
+  const hasUnsavedChanges = useMemo(() => {
+    return JSON.stringify(commands) !== savedCommandsJSON;
+  }, [commands, savedCommandsJSON]);
+
+  useEffect(() => {
+    saveState("savedCommandsJSON", savedCommandsJSON);
+  }, [savedCommandsJSON]);
+
   useEffect(() => {
     fetchProjects()
       .then(setProjectsList)
@@ -527,6 +540,7 @@ function App() {
         setCurrentProjectId(data.id);
         setCurrentProjectName(data.name);
         setProjectsList((prev) => [...prev, { id: data.id!, name: data.name }]);
+        setSavedCommandsJSON(JSON.stringify(data.commands));
         alert("プロジェクトを作成しました");
       }
     } catch (err) {
@@ -552,6 +566,7 @@ function App() {
         commands,
         settings: buildProjectSettings(),
       });
+      setSavedCommandsJSON(JSON.stringify(commands));
       alert("プロジェクトを上書き保存しました");
     } catch (err) {
       console.error(err);
@@ -571,7 +586,7 @@ function App() {
 
   const handleLoadProject = async (id: string) => {
     // 未保存の変更がある場合は確認ダイアログを表示
-    if (commands.length > 0) {
+    if (hasUnsavedChanges) {
       const confirmed = window.confirm(
         "現在の編集内容は保存されていません。\nプロジェクトを切り替えますか？",
       );
@@ -583,6 +598,7 @@ function App() {
         setCurrentProjectId(data.id);
         setCurrentProjectName(data.name);
         setCommands(data.commands);
+        setSavedCommandsJSON(JSON.stringify(data.commands));
         if (data.settings) {
           if (data.settings.selectedModelId)
             setSelectedModelId(data.settings.selectedModelId as string);
@@ -2379,6 +2395,7 @@ function App() {
         <Sidebar
           commands={commands}
           activeCommandId={activeCommandId}
+          hasUnsavedChanges={hasUnsavedChanges}
           onSelectCommand={setActiveCommandId}
           onDeleteCommand={(id) => {
             saveToHistory();

@@ -55,6 +55,7 @@ interface SidebarProps {
   onSaveAsProject: () => void;
   onDeleteProject: (id: string) => void;
   onRenameProject: (id: string) => void;
+  hasUnsavedChanges: boolean;
 }
 
 // ----------------------------------------------------------------------------
@@ -667,6 +668,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
     onSaveAsProject,
     onDeleteProject,
     onRenameProject,
+    hasUnsavedChanges,
   } = props;
 
   const [editingId, setEditingId] = React.useState<string | null>(null);
@@ -728,11 +730,23 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
           </div>
           <div className="flex items-center space-x-1 flex-shrink-0">
             <button
-              onClick={onSaveProject}
-              className="text-[10px] font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 py-1 rounded transition-colors"
-              title="現在の状態を上書き保存"
+              onClick={
+                hasUnsavedChanges || !currentProjectId
+                  ? onSaveProject
+                  : undefined
+              }
+              className={`text-[10px] font-medium px-2 py-1 rounded transition-colors border ${
+                hasUnsavedChanges || !currentProjectId
+                  ? "text-blue-600 bg-blue-50 hover:bg-blue-100 border-blue-200"
+                  : "text-gray-500 bg-gray-50 border-gray-200 opacity-70 cursor-default"
+              }`}
+              title={
+                hasUnsavedChanges || !currentProjectId
+                  ? "現在の状態を上書き保存"
+                  : "変更はありません"
+              }
             >
-              💾 保存
+              {hasUnsavedChanges || !currentProjectId ? "💾 保存" : "✔️ 保存済"}
             </button>
             <button
               onClick={onSaveAsProject}
