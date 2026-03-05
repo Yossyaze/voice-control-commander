@@ -810,7 +810,6 @@ export function createGestureData(
   return archiver.toBytes();
 }
 
-
 // --- エクスポート用インターフェース ---
 
 export interface ExportCommandData {
@@ -820,7 +819,6 @@ export interface ExportCommandData {
   strokes: Point[][];
   stroke_waits?: number[];
 }
-
 
 /**
  * XML plist の文字列を構築する。
@@ -912,10 +910,16 @@ export function createCombinedPlist(
 ): Uint8Array {
   const commandsTable: Record<string, unknown> = {};
 
+  let index = 0;
   for (const cmd of commandsData) {
-    const cmdId =
-      cmd.id ||
-      `Custom.${Math.floor(Date.now() / 1000)}.${crypto.randomUUID().replace(/-/g, "").slice(0, 6)}`;
+    // インデックスをゼロパディングしてIDの先頭に付与することで、
+    // Plistの辞書(アルファベット順)ソート後も配列の順番を維持する。
+    // 例: Custom.0000.167812345.abcdef
+    const indexStr = String(index).padStart(4, "0");
+    const timestamp = Math.floor(Date.now() / 1000);
+    const shortUuid = crypto.randomUUID().replace(/-/g, "").slice(0, 6);
+    const cmdId = `Custom.${indexStr}.${timestamp}.${shortUuid}`;
+    index++;
 
     let strokesToUse: Point[][] = [];
     if (cmd.strokes && cmd.strokes.length > 0) {

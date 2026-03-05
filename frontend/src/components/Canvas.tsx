@@ -73,8 +73,10 @@ const Canvas: React.FC<CanvasProps> = ({
     isDragging: boolean;
     targetId: string | null;
     dragType: "move" | "start" | "end" | "pan" | null;
-    lastX: number;
-    lastY: number;
+    lastX: number; // Logical X For Path Drag
+    lastY: number; // Logical Y For Path Drag
+    lastClientX: number; // Physical X for Pan
+    lastClientY: number; // Physical Y for Pan
     startX: number;
     startY: number;
   }>({
@@ -83,6 +85,8 @@ const Canvas: React.FC<CanvasProps> = ({
     dragType: null,
     lastX: 0,
     lastY: 0,
+    lastClientX: 0,
+    lastClientY: 0,
     startX: 0,
     startY: 0,
   });
@@ -117,18 +121,36 @@ const Canvas: React.FC<CanvasProps> = ({
       // Draw background image if available
       if (backgroundImage) {
         const img = new Image();
-        img.src = backgroundImage;
-        // We need to ensure image is loaded before drawing, but since we are using data URL, it might be fast.
-        // However, to be safe and avoid flickering or missing image on first render if not cached:
-        if (img.complete) {
-          // Draw image to fit logical dimensions
+
+        // onloadとonerrorのハンドラを先に設定する（キャッシュされた画像でも安全に発火させるため）
+        img.onload = () => {
           ctx.drawImage(img, 0, 0, width, height);
           drawGridAndPaths();
-        } else {
-          img.onload = () => {
-            ctx.drawImage(img, 0, 0, width, height);
-            drawGridAndPaths();
-          };
+        };
+
+        img.onerror = () => {
+          // 画像読み込みエラー時はグレー背景を描画してストロークを描画
+          console.warn(
+            "Background image failed to load, falling back to default background.",
+          );
+          ctx.fillStyle = "#f3f4f6";
+          ctx.fillRect(0, 0, width, height);
+          ctx.strokeStyle = "#9ca3af";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(0, 0, width, height);
+          drawGridAndPaths();
+        };
+
+        img.src = backgroundImage;
+
+        if (img.complete && img.naturalHeight !== 0) {
+          // すでに完全に読み込まれている場合 (キャッシュヒット等)
+          // onloadが呼ばれない可能性があるため手動で描画
+          ctx.drawImage(img, 0, 0, width, height);
+          drawGridAndPaths();
+          // 再度onloadが呼ばれるのを防ぐ
+          img.onload = null;
+          img.onerror = null;
         }
       } else {
         ctx.fillStyle = "#f3f4f6"; // gray-100
@@ -394,7 +416,14 @@ const Canvas: React.FC<CanvasProps> = ({
     // Coordinate within the element, scaled back down to the 1.0 (unscaled) logical coordinate size
     const x = ((clientX - rect.left) / rect.width) * width;
     const y = ((clientY - rect.top) / rect.height) * height;
-    return { x, y };
+
+    // clientX, clientY が undefinend にならないようにする（フォールバック）
+    return {
+      x,
+      y,
+      clientX: clientX || 0,
+      clientY: clientY || 0,
+    };
   };
 
   const isPointNear = (
@@ -492,6 +521,8 @@ const Canvas: React.FC<CanvasProps> = ({
           dragType: type,
           lastX: pos.x,
           lastY: pos.y,
+          lastClientX: pos.clientX,
+          lastClientY: pos.clientY,
           startX: pos.x,
           startY: pos.y,
         });
@@ -507,6 +538,8 @@ const Canvas: React.FC<CanvasProps> = ({
         dragType: "pan",
         lastX: pos.x,
         lastY: pos.y,
+        lastClientX: pos.clientX,
+        lastClientY: pos.clientY,
         startX: pos.x,
         startY: pos.y,
       });
@@ -534,16 +567,19 @@ const Canvas: React.FC<CanvasProps> = ({
       }
 
       // dragging
-      const deltaX = pos.x - dragState.lastX;
-      const deltaY = pos.y - dragState.lastY;
-
       if (dragState.dragType === "pan" && onPan) {
-        onPan(deltaX, deltaY);
+        // パン移動は物理的なピクセル(clientX)の差分を使う
+        const deltaClientX = pos.clientX - dragState.lastClientX;
+        const deltaClientY = pos.clientY - dragState.lastClientY;
+        onPan(deltaClientX, deltaClientY);
       } else if (
         dragState.targetId &&
         onPathDrag &&
         dragState.dragType !== "pan"
       ) {
+        // パスのドラッグは論理座標(x)の差分を使う
+        const deltaX = pos.x - dragState.lastX;
+        const deltaY = pos.y - dragState.lastY;
         onPathDrag(dragState.targetId, deltaX, deltaY, dragState.dragType);
       }
 
@@ -551,6 +587,8 @@ const Canvas: React.FC<CanvasProps> = ({
         ...prev,
         lastX: pos.x,
         lastY: pos.y,
+        lastClientX: pos.clientX,
+        lastClientY: pos.clientY,
       }));
       return;
     }
@@ -605,6 +643,8 @@ const Canvas: React.FC<CanvasProps> = ({
       dragType: null,
       lastX: 0,
       lastY: 0,
+      lastClientX: 0,
+      lastClientY: 0,
       startX: 0,
       startY: 0,
     });
