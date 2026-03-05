@@ -394,7 +394,7 @@ const Canvas: React.FC<CanvasProps> = ({
       | React.TouchEvent<HTMLDivElement>,
   ) => {
     const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return { x: 0, y: 0 };
+    if (!rect) return { x: 0, y: 0, clientX: 0, clientY: 0 };
 
     let clientX = 0;
     let clientY = 0;
