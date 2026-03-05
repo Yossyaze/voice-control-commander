@@ -734,9 +734,7 @@ function App() {
     loadState<number>("scale", 0.6),
   );
 
-  const [backgroundImage, setBackgroundImage] = useState<string | null>(() =>
-    loadState<string | null>("backgroundImage", null),
-  );
+  const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
 
   const [backgroundsList, setBackgroundsList] = useState<BackgroundImage[]>([]);
 
@@ -746,6 +744,15 @@ function App() {
       try {
         const bgData = await fetchBackgrounds();
         setBackgroundsList(bgData);
+
+        // localStorage から最後に使用した背景IDを復元
+        const savedBgId = loadState<string | null>("backgroundImageId", null);
+        if (savedBgId) {
+          const matchedBg = bgData.find((bg) => bg.id === savedBgId);
+          if (matchedBg) {
+            setBackgroundImage(matchedBg.url);
+          }
+        }
       } catch (err) {
         console.error("背景画像の取得に失敗しました:", err);
       }
@@ -850,8 +857,12 @@ function App() {
     saveState("scale", scale);
   }, [scale]);
   useEffect(() => {
-    saveState("backgroundImage", backgroundImage);
-  }, [backgroundImage]);
+    // 保存するのは無効になるURL文字列ではなくID
+    const bgId = backgroundImage
+      ? (backgroundsList.find((bg) => bg.url === backgroundImage)?.id ?? null)
+      : null;
+    saveState("backgroundImageId", bgId);
+  }, [backgroundImage, backgroundsList]);
   useEffect(() => {
     saveState("showGrid", showGrid);
   }, [showGrid]);
