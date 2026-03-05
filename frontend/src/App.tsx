@@ -737,6 +737,8 @@ function App() {
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
 
   const [backgroundsList, setBackgroundsList] = useState<BackgroundImage[]>([]);
+  // 背景リストの初回ロードが完了したかどうかのフラグ
+  const [isBackgroundsLoaded, setIsBackgroundsLoaded] = useState(false);
 
   // 起動時に背景画像リストを取得
   useEffect(() => {
@@ -753,8 +755,10 @@ function App() {
             setBackgroundImage(matchedBg.url);
           }
         }
+        setIsBackgroundsLoaded(true);
       } catch (err) {
         console.error("背景画像の取得に失敗しました:", err);
+        setIsBackgroundsLoaded(true);
       }
     };
     loadBackgrounds();
@@ -857,12 +861,14 @@ function App() {
     saveState("scale", scale);
   }, [scale]);
   useEffect(() => {
+    if (!isBackgroundsLoaded) return; // ロード完了前は保存しない（初期化でnullを上書きするのを防ぐ）
+
     // 保存するのは無効になるURL文字列ではなくID
     const bgId = backgroundImage
       ? (backgroundsList.find((bg) => bg.url === backgroundImage)?.id ?? null)
       : null;
     saveState("backgroundImageId", bgId);
-  }, [backgroundImage, backgroundsList]);
+  }, [backgroundImage, backgroundsList, isBackgroundsLoaded]);
   useEffect(() => {
     saveState("showGrid", showGrid);
   }, [showGrid]);
