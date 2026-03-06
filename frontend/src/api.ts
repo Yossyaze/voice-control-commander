@@ -19,18 +19,52 @@ import {
 } from "firebase/firestore";
 
 /**
- * Firestoreにデータを保存する際、`undefined` が含まれていると
- * "FirebaseError: Function setDoc() called with invalid data" エラーが発生するため、
- * オブジェクトから undefined を再帰的に取り除くユーティリティ。
+ * Firestoreにデータを保存する際、
+ * 1. `undefined` が含まれているとエラーになる
+ * 2. Nested Arrays (配列の配列)が含まれているとエラーになる
+ * そのため、オブジェクトから undefined を除去し、
+ * 配列の中にさらに配列が含まれるもの（例: strokes: Point[][]）は JSON 文字列に変換する。
  */
-function removeUndefined(obj: any): any {
+function serializeForFirestore(obj: any): any {
   if (Array.isArray(obj)) {
-    return obj.map(removeUndefined);
+    // Nested Array かどうかチェック
+    // 配列の要素に一つでも配列があれば、この配列自体をシリアライズする
+    const hasNestedArray = obj.some((item) => Array.isArray(item));
+    if (hasNestedArray) {
+      return { _isNestedArray: true, data: JSON.stringify(obj) };
+    }
+    // Nested Arrayでなければ、各要素を再帰的に処理
+    return obj.map(serializeForFirestore);
   } else if (obj !== null && typeof obj === "object") {
+    if (obj._isNestedArray) return obj;
     return Object.keys(obj).reduce((acc, key) => {
       if (obj[key] !== undefined) {
-        acc[key] = removeUndefined(obj[key]);
+        acc[key] = serializeForFirestore(obj[key]);
       }
+      return acc;
+    }, {} as any);
+  }
+  return obj;
+}
+
+/**
+ * Firestore から取得したデータを元の形に復元するユーティリティ。
+ * _isNestedArray フラグを持つオブジェクトを配列に戻す。
+ */
+function deserializeFromFirestore(obj: any): any {
+  if (Array.isArray(obj)) {
+    return obj.map(deserializeFromFirestore);
+  } else if (obj !== null && typeof obj === "object") {
+    if (obj._isNestedArray && typeof obj.data === "string") {
+      try {
+        return JSON.parse(obj.data);
+      } catch (e) {
+        console.error("Failed to parse nested array from Firestore", e);
+        return [];
+      }
+    }
+    return Object.keys(obj).reduce((acc, key) => {
+      acc[key] = deserializeFromFirestore(obj[key]);
       return acc;
     }, {} as any);
   }
@@ -242,7 +276,7 @@ export const loadProject = async (id: string): Promise<ProjectData> => {
     if (!snap.exists()) {
       throw new Error("プロジェクトが見つかりません");
     }
-    const data = snap.data();
+    const data = deserializeFromFirestore(snap.data());
     return {
       id: snap.id,
       name: data.name,
@@ -288,7 +322,7 @@ export const createProject = async (
     const docRef = doc(db, "users", auth.currentUser.uid, "projects", id);
     await setDoc(
       docRef,
-      removeUndefined({
+      serializeForFirestore({
         name: data.name,
         commands: data.commands,
         settings: data.settings,
@@ -338,7 +372,7 @@ export const updateProject = async (
     const docRef = doc(db, "users", auth.currentUser.uid, "projects", id);
     await updateDoc(
       docRef,
-      removeUndefined({
+      serializeForFirestore({
         name: data.name,
         commands: data.commands,
         settings: data.settings,
