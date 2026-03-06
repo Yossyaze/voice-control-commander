@@ -5,7 +5,9 @@
 
 import { parseVoiceControlCommands, createCombinedPlist } from "./utils/parser";
 import type { ParseResult, ExportCommandData } from "./utils/parser";
-
+import { auth, db as firestoreDb, storage } from "./lib/firebase";
+import { collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, orderBy } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 // --- 型定義 (変更なし) ---
 
 export interface Point {
@@ -167,6 +169,18 @@ async function migrateProjectsFromLocalStorage(): Promise<void> {
 
 /** プロジェクト一覧を取得（更新日時の新しい順） */
 export const fetchProjects = async (): Promise<ProjectSummary[]> => {
+  if (auth.currentUser) {
+    const q = query(
+      collection(firestoreDb, "users", auth.currentUser.uid, "projects"),
+      orderBy("updatedAt", "desc")
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((d) => ({
+      id: d.id,
+      name: d.data().name,
+    }));
+  }
+
   await migrateProjectsFromLocalStorage();
 
   const db = await openProjDb();
@@ -194,6 +208,21 @@ export const fetchProjects = async (): Promise<ProjectSummary[]> => {
 
 /** プロジェクトを読み込む */
 export const loadProject = async (id: string): Promise<ProjectData> => {
+  if (auth.currentUser) {
+    const docRef = doc(firestoreDb, "users", auth.currentUser.uid, "projects", id);
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) {
+      throw new Error("プロジェクトが見つかりません");
+    }
+    const data = snap.data();
+    return {
+      id: snap.id,
+      name: data.name,
+      commands: data.commands,
+      settings: data.settings,
+    };
+  }
+
   const db = await openProjDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(PROJ_STORE_NAME, "readonly");
@@ -226,6 +255,23 @@ export const createProject = async (
   data: ProjectData,
 ): Promise<ProjectData> => {
   const id = crypto.randomUUID();
+
+  if (auth.currentUser) {
+    const docRef = doc(firestoreDb, "users", auth.currentUser.uid, "projects", id);
+    await setDoc(docRef, {
+      name: data.name,
+      commands: data.commands,
+      settings: data.settings,
+      updatedAt: Date.now()
+    });
+    return {
+      id,
+      name: data.name,
+      commands: data.commands,
+      settings: data.settings,
+    };
+  }
+
   const record: ProjectRecord = {
     id,
     name: data.name,
@@ -257,8 +303,23 @@ export const updateProject = async (
   id: string,
   data: ProjectData,
 ): Promise<ProjectData> => {
-  const db = await openProjDb();
+  if (auth.currentUser) {
+    const docRef = doc(firestoreDb, "users", auth.currentUser.uid, "projects", id);
+    await updateDoc(docRef, {
+      name: data.name,
+      commands: data.commands,
+      settings: data.settings,
+      updatedAt: Date.now()
+    });
+    return {
+      id,
+      name: data.name,
+      commands: data.commands,
+      settings: data.settings,
+    };
+  }
 
+  const db = await openProjDb();
   // 存在確認
   const existing = await new Promise<ProjectRecord | undefined>(
     (resolve, reject) => {
@@ -305,6 +366,15 @@ export const renameProject = async (
   id: string,
   newName: string,
 ): Promise<void> => {
+  if (auth.currentUser) {
+    const docRef = doc(firestoreDb, "users", auth.currentUser.uid, "projects", id);
+    await updateDoc(docRef, {
+      name: newName,
+      updatedAt: Date.now()
+    });
+    return;
+  }
+
   const db = await openProjDb();
 
   const existing = await new Promise<ProjectRecord | undefined>(
@@ -337,6 +407,12 @@ export const renameProject = async (
 
 /** プロジェクトを削除 */
 export const deleteProject = async (id: string): Promise<void> => {
+  if (auth.currentUser) {
+    const docRef = doc(firestoreDb, "users", auth.currentUser.uid, "projects", id);
+    await deleteDoc(docRef);
+    return;
+  }
+
   const db = await openProjDb();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(PROJ_STORE_NAME, "readwrite");
@@ -442,6 +518,18 @@ async function migrateFromLocalStorage(): Promise<void> {
 
 /** 背景画像一覧を取得（新しい順） */
 export async function fetchBackgrounds(): Promise<BackgroundImage[]> {
+  if (auth.currentUser) {
+    const q = query(
+      collection(firestoreDb, "users", auth.currentUser.uid, "backgrounds"),
+      orderBy("createdAt", "desc")
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      url: doc.data().url
+    }));
+  }
+
   // 初回のみ旧データをマイグレーション
   await migrateFromLocalStorage();
 
@@ -469,9 +557,21 @@ export async function fetchBackgrounds(): Promise<BackgroundImage[]> {
   });
 }
 
-/** 背景画像をアップロード（IndexedDB に Blob として保存） */
+/** 背景画像をアップロード（IndexedDB または Firebase Storage） */
 export async function uploadBackground(file: File): Promise<BackgroundImage> {
   const id = crypto.randomUUID();
+
+  if (auth.currentUser) {
+    const path = `users/${auth.currentUser.uid}/backgrounds/${id}_${file.name}`;
+    const storageRef = ref(storage, path);
+    await uploadBytes(storageRef, file);
+    const url = await getDownloadURL(storageRef);
+    
+    const docRef = doc(firestoreDb, "users", auth.currentUser.uid, "backgrounds", id);
+    await setDoc(docRef, { url, storagePath: path, createdAt: Date.now() });
+    return { id, url };
+  }
+
   const blob = new Blob([await file.arrayBuffer()], { type: file.type });
 
   const record: BackgroundRecord = {
@@ -495,6 +595,20 @@ export async function uploadBackground(file: File): Promise<BackgroundImage> {
 
 /** 背景画像を削除 */
 export async function deleteBackground(id: string): Promise<void> {
+  if (auth.currentUser) {
+    const docRef = doc(firestoreDb, "users", auth.currentUser.uid, "backgrounds", id);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data.storagePath) {
+        const fileRef = ref(storage, data.storagePath);
+        await deleteObject(fileRef).catch(console.error);
+      }
+      await deleteDoc(docRef);
+    }
+    return;
+  }
+
   const db = await openBgDb();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(BG_STORE_NAME, "readwrite");

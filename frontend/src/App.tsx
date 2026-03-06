@@ -3,6 +3,8 @@ import { arrayMove } from "@dnd-kit/sortable";
 import Canvas from "./components/Canvas";
 import ControlPanel from "./components/ControlPanel";
 import Sidebar from "./components/Sidebar";
+import AuthStatus from "./components/AuthStatus";
+import { useAuth } from "./contexts/AuthContext";
 import {
   type Command,
   type Point,
@@ -508,11 +510,13 @@ function App() {
     saveState("savedCommandsJSON", savedCommandsJSON);
   }, [savedCommandsJSON]);
 
+  const { currentUser } = useAuth(); // ログイン状態を取得
+
   useEffect(() => {
     fetchProjects()
       .then(setProjectsList)
       .catch((err) => console.error("Failed to load projects list", err));
-  }, []);
+  }, [currentUser]); // currentUser が変化したら再取得
 
   // 現在の背景画像に対応する IndexedDB の ID を取得するヘルパー
   const getCurrentBackgroundImageId = (): string | null => {
@@ -778,7 +782,7 @@ function App() {
       }
     };
     loadBackgrounds();
-  }, []);
+  }, [currentUser]);
   const [showGrid, setShowGrid] = useState<boolean>(() =>
     loadState<boolean>("showGrid", false),
   );
@@ -2619,6 +2623,8 @@ function App() {
                 </svg>
               </button>
               <div className="h-4 w-px bg-gray-300 mx-2" />
+              <AuthStatus />
+              <div className="h-4 w-px bg-gray-300 mx-1" />
               <button
                 onClick={handleExportAll}
                 className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 shadow-sm transition-colors"
