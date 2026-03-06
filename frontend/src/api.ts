@@ -17,6 +17,25 @@ import {
   query,
   orderBy,
 } from "firebase/firestore";
+
+/**
+ * Firestoreにデータを保存する際、`undefined` が含まれていると
+ * "FirebaseError: Function setDoc() called with invalid data" エラーが発生するため、
+ * オブジェクトから undefined を再帰的に取り除くユーティリティ。
+ */
+function removeUndefined(obj: any): any {
+  if (Array.isArray(obj)) {
+    return obj.map(removeUndefined);
+  } else if (obj !== null && typeof obj === "object") {
+    return Object.keys(obj).reduce((acc, key) => {
+      if (obj[key] !== undefined) {
+        acc[key] = removeUndefined(obj[key]);
+      }
+      return acc;
+    }, {} as any);
+  }
+  return obj;
+}
 // --- 型定義 (変更なし) ---
 
 export interface Point {
@@ -267,12 +286,15 @@ export const createProject = async (
 
   if (auth.currentUser) {
     const docRef = doc(db, "users", auth.currentUser.uid, "projects", id);
-    await setDoc(docRef, {
-      name: data.name,
-      commands: data.commands,
-      settings: data.settings,
-      updatedAt: Date.now(),
-    });
+    await setDoc(
+      docRef,
+      removeUndefined({
+        name: data.name,
+        commands: data.commands,
+        settings: data.settings,
+        updatedAt: Date.now(),
+      }),
+    );
     return {
       id,
       name: data.name,
@@ -314,12 +336,15 @@ export const updateProject = async (
 ): Promise<ProjectData> => {
   if (auth.currentUser) {
     const docRef = doc(db, "users", auth.currentUser.uid, "projects", id);
-    await updateDoc(docRef, {
-      name: data.name,
-      commands: data.commands,
-      settings: data.settings,
-      updatedAt: Date.now(),
-    });
+    await updateDoc(
+      docRef,
+      removeUndefined({
+        name: data.name,
+        commands: data.commands,
+        settings: data.settings,
+        updatedAt: Date.now(),
+      }),
+    );
     return {
       id,
       name: data.name,
