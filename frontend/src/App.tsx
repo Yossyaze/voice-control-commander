@@ -518,20 +518,21 @@ function App() {
       .catch((err) => console.error("Failed to load projects list", err));
   }, [currentUser]); // currentUser が変化したら再取得
 
-  // 現在の背景画像に対応する IndexedDB の ID を取得するヘルパー
-  const getCurrentBackgroundImageId = (): string | null => {
-    if (!backgroundImage) return null;
-    const found = backgroundsList.find((bg) => bg.url === backgroundImage);
-    return found?.id ?? null;
-  };
-
   // プロジェクトの設定を組み立てるヘルパー
-  const buildProjectSettings = () => ({
-    selectedModelId,
-    orientation,
-    scale,
-    backgroundImageId: getCurrentBackgroundImageId(),
-  });
+  const buildProjectSettings = () => {
+    let backgroundImageId: string | null = null;
+    if (backgroundImage) {
+      const found = backgroundsList.find((bg) => bg.url === backgroundImage);
+      backgroundImageId = found?.id ?? null;
+    }
+
+    return {
+      selectedModelId,
+      orientation,
+      scale,
+      backgroundImageId,
+    };
+  };
 
   const handleCreateProject = async (name: string) => {
     try {
