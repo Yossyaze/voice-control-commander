@@ -5,9 +5,18 @@
 
 import { parseVoiceControlCommands, createCombinedPlist } from "./utils/parser";
 import type { ParseResult, ExportCommandData } from "./utils/parser";
-import { auth, db as firestoreDb, storage } from "./lib/firebase";
-import { collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, orderBy } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { auth, db } from "./lib/firebase";
+import {
+  collection,
+  doc,
+  setDoc,
+  getDoc,
+  getDocs,
+  updateDoc,
+  deleteDoc,
+  query,
+  orderBy,
+} from "firebase/firestore";
 // --- 型定義 (変更なし) ---
 
 export interface Point {
@@ -137,8 +146,8 @@ async function migrateProjectsFromLocalStorage(): Promise<void> {
       return;
     }
 
-    const db = await openProjDb();
-    const tx = db.transaction(PROJ_STORE_NAME, "readwrite");
+    const dbInstance = await openProjDb();
+    const tx = dbInstance.transaction(PROJ_STORE_NAME, "readwrite");
     const store = tx.objectStore(PROJ_STORE_NAME);
 
     for (let i = 0; i < entries.length; i++) {
@@ -158,7 +167,7 @@ async function migrateProjectsFromLocalStorage(): Promise<void> {
       tx.onerror = () => reject(tx.error);
     });
 
-    db.close();
+    dbInstance.close();
 
     localStorage.removeItem(LEGACY_KEY);
     localStorage.setItem(MIGRATED_FLAG, "true");
@@ -171,8 +180,8 @@ async function migrateProjectsFromLocalStorage(): Promise<void> {
 export const fetchProjects = async (): Promise<ProjectSummary[]> => {
   if (auth.currentUser) {
     const q = query(
-      collection(firestoreDb, "users", auth.currentUser.uid, "projects"),
-      orderBy("updatedAt", "desc")
+      collection(db, "users", auth.currentUser.uid, "projects"),
+      orderBy("updatedAt", "desc"),
     );
     const snapshot = await getDocs(q);
     return snapshot.docs.map((d) => ({
@@ -183,9 +192,9 @@ export const fetchProjects = async (): Promise<ProjectSummary[]> => {
 
   await migrateProjectsFromLocalStorage();
 
-  const db = await openProjDb();
+  const dbInstance = await openProjDb();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(PROJ_STORE_NAME, "readonly");
+    const tx = dbInstance.transaction(PROJ_STORE_NAME, "readonly");
     const store = tx.objectStore(PROJ_STORE_NAME);
     const request = store.getAll();
 
@@ -196,11 +205,11 @@ export const fetchProjects = async (): Promise<ProjectSummary[]> => {
         id: r.id,
         name: r.name,
       }));
-      db.close();
+      dbInstance.close();
       resolve(summaries);
     };
     request.onerror = () => {
-      db.close();
+      dbInstance.close();
       reject(request.error);
     };
   });
@@ -209,7 +218,7 @@ export const fetchProjects = async (): Promise<ProjectSummary[]> => {
 /** プロジェクトを読み込む */
 export const loadProject = async (id: string): Promise<ProjectData> => {
   if (auth.currentUser) {
-    const docRef = doc(firestoreDb, "users", auth.currentUser.uid, "projects", id);
+    const docRef = doc(db, "users", auth.currentUser.uid, "projects", id);
     const snap = await getDoc(docRef);
     if (!snap.exists()) {
       throw new Error("プロジェクトが見つかりません");
@@ -223,14 +232,14 @@ export const loadProject = async (id: string): Promise<ProjectData> => {
     };
   }
 
-  const db = await openProjDb();
+  const dbInstance = await openProjDb();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(PROJ_STORE_NAME, "readonly");
+    const tx = dbInstance.transaction(PROJ_STORE_NAME, "readonly");
     const store = tx.objectStore(PROJ_STORE_NAME);
     const request = store.get(id);
 
     request.onsuccess = () => {
-      db.close();
+      dbInstance.close();
       const record: ProjectRecord | undefined = request.result;
       if (!record) {
         reject(new Error("プロジェクトが見つかりません"));
@@ -244,7 +253,7 @@ export const loadProject = async (id: string): Promise<ProjectData> => {
       });
     };
     request.onerror = () => {
-      db.close();
+      dbInstance.close();
       reject(request.error);
     };
   });
@@ -257,12 +266,12 @@ export const createProject = async (
   const id = crypto.randomUUID();
 
   if (auth.currentUser) {
-    const docRef = doc(firestoreDb, "users", auth.currentUser.uid, "projects", id);
+    const docRef = doc(db, "users", auth.currentUser.uid, "projects", id);
     await setDoc(docRef, {
       name: data.name,
       commands: data.commands,
       settings: data.settings,
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
     });
     return {
       id,
@@ -280,15 +289,15 @@ export const createProject = async (
     updatedAt: Date.now(),
   };
 
-  const db = await openProjDb();
+  const dbInstance = await openProjDb();
   await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(PROJ_STORE_NAME, "readwrite");
+    const tx = dbInstance.transaction(PROJ_STORE_NAME, "readwrite");
     const store = tx.objectStore(PROJ_STORE_NAME);
     store.put(record);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
-  db.close();
+  dbInstance.close();
 
   return {
     id,
@@ -304,12 +313,12 @@ export const updateProject = async (
   data: ProjectData,
 ): Promise<ProjectData> => {
   if (auth.currentUser) {
-    const docRef = doc(firestoreDb, "users", auth.currentUser.uid, "projects", id);
+    const docRef = doc(db, "users", auth.currentUser.uid, "projects", id);
     await updateDoc(docRef, {
       name: data.name,
       commands: data.commands,
       settings: data.settings,
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
     });
     return {
       id,
@@ -319,11 +328,11 @@ export const updateProject = async (
     };
   }
 
-  const db = await openProjDb();
+  const dbInstance = await openProjDb();
   // 存在確認
   const existing = await new Promise<ProjectRecord | undefined>(
     (resolve, reject) => {
-      const tx = db.transaction(PROJ_STORE_NAME, "readonly");
+      const tx = dbInstance.transaction(PROJ_STORE_NAME, "readonly");
       const store = tx.objectStore(PROJ_STORE_NAME);
       const request = store.get(id);
       request.onsuccess = () => resolve(request.result);
@@ -332,7 +341,7 @@ export const updateProject = async (
   );
 
   if (!existing) {
-    db.close();
+    dbInstance.close();
     throw new Error("プロジェクトが見つかりません");
   }
 
@@ -345,13 +354,13 @@ export const updateProject = async (
   };
 
   await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(PROJ_STORE_NAME, "readwrite");
+    const tx = dbInstance.transaction(PROJ_STORE_NAME, "readwrite");
     const store = tx.objectStore(PROJ_STORE_NAME);
     store.put(record);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
-  db.close();
+  dbInstance.close();
 
   return {
     id,
@@ -367,19 +376,19 @@ export const renameProject = async (
   newName: string,
 ): Promise<void> => {
   if (auth.currentUser) {
-    const docRef = doc(firestoreDb, "users", auth.currentUser.uid, "projects", id);
+    const docRef = doc(db, "users", auth.currentUser.uid, "projects", id);
     await updateDoc(docRef, {
       name: newName,
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
     });
     return;
   }
 
-  const db = await openProjDb();
+  const dbInstance = await openProjDb();
 
   const existing = await new Promise<ProjectRecord | undefined>(
     (resolve, reject) => {
-      const tx = db.transaction(PROJ_STORE_NAME, "readonly");
+      const tx = dbInstance.transaction(PROJ_STORE_NAME, "readonly");
       const store = tx.objectStore(PROJ_STORE_NAME);
       const request = store.get(id);
       request.onsuccess = () => resolve(request.result);
@@ -388,7 +397,7 @@ export const renameProject = async (
   );
 
   if (!existing) {
-    db.close();
+    dbInstance.close();
     throw new Error("プロジェクトが見つかりません");
   }
 
@@ -396,32 +405,32 @@ export const renameProject = async (
   existing.updatedAt = Date.now();
 
   await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(PROJ_STORE_NAME, "readwrite");
+    const tx = dbInstance.transaction(PROJ_STORE_NAME, "readwrite");
     const store = tx.objectStore(PROJ_STORE_NAME);
     store.put(existing);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
-  db.close();
+  dbInstance.close();
 };
 
 /** プロジェクトを削除 */
 export const deleteProject = async (id: string): Promise<void> => {
   if (auth.currentUser) {
-    const docRef = doc(firestoreDb, "users", auth.currentUser.uid, "projects", id);
+    const docRef = doc(db, "users", auth.currentUser.uid, "projects", id);
     await deleteDoc(docRef);
     return;
   }
 
-  const db = await openProjDb();
+  const dbInstance = await openProjDb();
   await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(PROJ_STORE_NAME, "readwrite");
+    const tx = dbInstance.transaction(PROJ_STORE_NAME, "readwrite");
     const store = tx.objectStore(PROJ_STORE_NAME);
     store.delete(id);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
-  db.close();
+  dbInstance.close();
 };
 
 // --- 背景画像 API (IndexedDB) ---
@@ -478,8 +487,8 @@ async function migrateFromLocalStorage(): Promise<void> {
       return;
     }
 
-    const db = await openBgDb();
-    const tx = db.transaction(BG_STORE_NAME, "readwrite");
+    const dbInstance = await openBgDb();
+    const tx = dbInstance.transaction(BG_STORE_NAME, "readwrite");
     const store = tx.objectStore(BG_STORE_NAME);
 
     for (let i = 0; i < legacyData.length; i++) {
@@ -505,7 +514,7 @@ async function migrateFromLocalStorage(): Promise<void> {
       tx.onerror = () => reject(tx.error);
     });
 
-    db.close();
+    dbInstance.close();
 
     // 旧データを削除してフラグを立てる
     localStorage.removeItem(LEGACY_KEY);
@@ -518,24 +527,12 @@ async function migrateFromLocalStorage(): Promise<void> {
 
 /** 背景画像一覧を取得（新しい順） */
 export async function fetchBackgrounds(): Promise<BackgroundImage[]> {
-  if (auth.currentUser) {
-    const q = query(
-      collection(firestoreDb, "users", auth.currentUser.uid, "backgrounds"),
-      orderBy("createdAt", "desc")
-    );
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      url: doc.data().url
-    }));
-  }
-
   // 初回のみ旧データをマイグレーション
   await migrateFromLocalStorage();
 
-  const db = await openBgDb();
+  const dbInstance = await openBgDb();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(BG_STORE_NAME, "readonly");
+    const tx = dbInstance.transaction(BG_STORE_NAME, "readonly");
     const store = tx.objectStore(BG_STORE_NAME);
     const request = store.getAll();
 
@@ -547,30 +544,19 @@ export async function fetchBackgrounds(): Promise<BackgroundImage[]> {
         id: r.id,
         url: URL.createObjectURL(r.blob),
       }));
-      db.close();
+      dbInstance.close();
       resolve(images);
     };
     request.onerror = () => {
-      db.close();
+      dbInstance.close();
       reject(request.error);
     };
   });
 }
 
-/** 背景画像をアップロード（IndexedDB または Firebase Storage） */
+/** 背景画像をアップロード（IndexedDB に Blob として保存） */
 export async function uploadBackground(file: File): Promise<BackgroundImage> {
   const id = crypto.randomUUID();
-
-  if (auth.currentUser) {
-    const path = `users/${auth.currentUser.uid}/backgrounds/${id}_${file.name}`;
-    const storageRef = ref(storage, path);
-    await uploadBytes(storageRef, file);
-    const url = await getDownloadURL(storageRef);
-    
-    const docRef = doc(firestoreDb, "users", auth.currentUser.uid, "backgrounds", id);
-    await setDoc(docRef, { url, storagePath: path, createdAt: Date.now() });
-    return { id, url };
-  }
 
   const blob = new Blob([await file.arrayBuffer()], { type: file.type });
 
@@ -580,44 +566,30 @@ export async function uploadBackground(file: File): Promise<BackgroundImage> {
     createdAt: Date.now(),
   };
 
-  const db = await openBgDb();
+  const dbInstance = await openBgDb();
   await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(BG_STORE_NAME, "readwrite");
+    const tx = dbInstance.transaction(BG_STORE_NAME, "readwrite");
     const store = tx.objectStore(BG_STORE_NAME);
     store.put(record);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
-  db.close();
+  dbInstance.close();
 
   return { id, url: URL.createObjectURL(blob) };
 }
 
 /** 背景画像を削除 */
 export async function deleteBackground(id: string): Promise<void> {
-  if (auth.currentUser) {
-    const docRef = doc(firestoreDb, "users", auth.currentUser.uid, "backgrounds", id);
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      const data = snap.data();
-      if (data.storagePath) {
-        const fileRef = ref(storage, data.storagePath);
-        await deleteObject(fileRef).catch(console.error);
-      }
-      await deleteDoc(docRef);
-    }
-    return;
-  }
-
-  const db = await openBgDb();
+  const dbInstance = await openBgDb();
   await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(BG_STORE_NAME, "readwrite");
+    const tx = dbInstance.transaction(BG_STORE_NAME, "readwrite");
     const store = tx.objectStore(BG_STORE_NAME);
     store.delete(id);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
-  db.close();
+  dbInstance.close();
 }
 
 // --- 後方互換性のためにダミーで残す定数 ---
