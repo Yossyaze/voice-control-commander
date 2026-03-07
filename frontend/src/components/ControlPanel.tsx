@@ -67,6 +67,74 @@ interface ControlPanelProps {
   onExportExtensionChange?: (ext: string) => void;
 }
 
+interface BufferedNumberInputProps extends Omit<
+  React.InputHTMLAttributes<HTMLInputElement>,
+  "value" | "onChange"
+> {
+  value: number;
+  onChange: (val: number) => void;
+  minVal?: number;
+  maxVal?: number;
+  format?: (val: number) => string;
+}
+
+const BufferedNumberInput: React.FC<BufferedNumberInputProps> = ({
+  value,
+  onChange,
+  minVal = -Infinity,
+  maxVal = Infinity,
+  format = (v) => v.toString(),
+  ...props
+}) => {
+  const [localValue, setLocalValue] = useState<string>(format(value));
+  const [isFocused, setIsFocused] = useState(false);
+
+  useEffect(() => {
+    if (!isFocused) {
+      setLocalValue(format(value));
+    }
+  }, [value, format, isFocused]);
+
+  const commitValue = (strVal: string) => {
+    if (strVal.trim() === "") {
+      onChange(minVal !== -Infinity ? minVal : 0);
+      setLocalValue(format(minVal !== -Infinity ? minVal : 0));
+      return;
+    }
+    let num = parseFloat(strVal);
+    if (isNaN(num)) {
+      num = minVal !== -Infinity ? minVal : 0;
+    }
+    num = Math.max(minVal, Math.min(maxVal, num));
+    onChange(num);
+    setLocalValue(format(num));
+  };
+
+  return (
+    <input
+      {...props}
+      type="number"
+      value={localValue}
+      onChange={(e) => setLocalValue(e.target.value)}
+      onFocus={(e) => {
+        setIsFocused(true);
+        props.onFocus?.(e);
+      }}
+      onBlur={(e) => {
+        setIsFocused(false);
+        commitValue(localValue);
+        props.onBlur?.(e);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.currentTarget.blur();
+        }
+        props.onKeyDown?.(e);
+      }}
+    />
+  );
+};
+
 const ControlPanel: React.FC<ControlPanelProps> = ({
   models,
   selectedModelId,
@@ -164,6 +232,38 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   useEffect(() => {
     return stopPress;
   }, [stopPress]);
+  // ------------------------------------
+
+  // --- Long Press Logic for Nudge ---
+  const nudgeTimerRef = useRef<number | null>(null);
+  const nudgeIntervalRef = useRef<number | null>(null);
+
+  const stopNudgePress = useCallback(() => {
+    if (nudgeTimerRef.current !== null)
+      window.clearTimeout(nudgeTimerRef.current);
+    if (nudgeIntervalRef.current !== null)
+      window.clearInterval(nudgeIntervalRef.current);
+  }, []);
+
+  const startNudgePress = useCallback(
+    (dx: number, dy: number) => {
+      // Single tap action
+      onNudge(dx, dy);
+
+      // Initial delay for long press
+      nudgeTimerRef.current = window.setTimeout(() => {
+        // Repeat interval
+        nudgeIntervalRef.current = window.setInterval(() => {
+          onNudge(dx, dy);
+        }, 50); // Fast repeat rate (50ms)
+      }, 300);
+    },
+    [onNudge],
+  );
+
+  useEffect(() => {
+    return stopNudgePress;
+  }, [stopNudgePress]);
   // ------------------------------------
 
   return (
@@ -642,8 +742,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   <div className="grid grid-cols-3 gap-1">
                     <div />
                     <button
-                      onClick={() => onNudge(0, -1)}
-                      className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 active:bg-gray-100"
+                      onPointerDown={() => startNudgePress(0, -1)}
+                      onPointerUp={stopNudgePress}
+                      onPointerLeave={stopNudgePress}
+                      onContextMenu={(e) => e.preventDefault()}
+                      className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 active:bg-gray-100 touch-none select-none"
                     >
                       <svg
                         className="w-3 h-3"
@@ -661,8 +764,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                     </button>
                     <div />
                     <button
-                      onClick={() => onNudge(-1, 0)}
-                      className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 active:bg-gray-100"
+                      onPointerDown={() => startNudgePress(-1, 0)}
+                      onPointerUp={stopNudgePress}
+                      onPointerLeave={stopNudgePress}
+                      onContextMenu={(e) => e.preventDefault()}
+                      className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 active:bg-gray-100 touch-none select-none"
                     >
                       <svg
                         className="w-3 h-3"
@@ -682,8 +788,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                       1px
                     </div>
                     <button
-                      onClick={() => onNudge(1, 0)}
-                      className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 active:bg-gray-100"
+                      onPointerDown={() => startNudgePress(1, 0)}
+                      onPointerUp={stopNudgePress}
+                      onPointerLeave={stopNudgePress}
+                      onContextMenu={(e) => e.preventDefault()}
+                      className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 active:bg-gray-100 touch-none select-none"
                     >
                       <svg
                         className="w-3 h-3"
@@ -701,8 +810,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                     </button>
                     <div />
                     <button
-                      onClick={() => onNudge(0, 1)}
-                      className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 active:bg-gray-100"
+                      onPointerDown={() => startNudgePress(0, 1)}
+                      onPointerUp={stopNudgePress}
+                      onPointerLeave={stopNudgePress}
+                      onContextMenu={(e) => e.preventDefault()}
+                      className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 active:bg-gray-100 touch-none select-none"
                     >
                       <svg
                         className="w-3 h-3"
@@ -714,7 +826,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                           strokeLinecap="round"
                           strokeLinejoin="round"
                           strokeWidth={2}
-                          d="M19 9l-7 7-7-7"
+                          d="M19 9l-7-7 7-7"
                         />
                       </svg>
                     </button>
@@ -754,20 +866,13 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                       所要時間
                     </label>
                     <div className="flex items-center space-x-1">
-                      <input
-                        type="number"
-                        min="0.1"
-                        max="5.0"
+                      <BufferedNumberInput
+                        minVal={0.1}
+                        maxVal={5.0}
                         step="0.05"
-                        value={Number(duration).toFixed(2)}
-                        onChange={(e) =>
-                          onDurationChange(
-                            Math.max(
-                              0.1,
-                              Math.min(5.0, parseFloat(e.target.value) || 0.1),
-                            ),
-                          )
-                        }
+                        value={duration}
+                        onChange={onDurationChange}
+                        format={(v) => Number(v).toFixed(2)}
                         className="w-16 text-xs font-mono bg-gray-100 px-1 py-0.5 rounded border border-transparent focus:border-blue-500 focus:bg-white text-right outline-none transition-colors"
                       />
                       <span className="text-xs text-gray-500">秒</span>
@@ -810,30 +915,25 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                     </label>
                     <div className="flex items-center space-x-2">
                       <div className="flex items-center space-x-1">
-                        <input
-                          type="number"
-                          min="0"
-                          max="1024"
+                        <BufferedNumberInput
+                          minVal={0}
+                          maxVal={1024}
                           step="1"
-                          value={Math.round(angle)}
-                          onChange={(e) =>
-                            onAngleChange(parseFloat(e.target.value) || 0)
-                          }
+                          value={angle}
+                          onChange={onAngleChange}
+                          format={(v) => Math.round(v).toString()}
                           className="w-12 text-xs font-mono bg-gray-100 px-1 py-0.5 rounded border border-transparent focus:border-purple-500 focus:bg-white text-right outline-none transition-colors"
                         />
                         <span className="text-[10px] text-gray-400">/1024</span>
                       </div>
                       <div className="flex items-center space-x-1">
-                        <input
-                          type="number"
-                          min="0"
-                          max="360"
+                        <BufferedNumberInput
+                          minVal={0}
+                          maxVal={360}
                           step="0.1"
-                          value={((angle / 1024) * 360).toFixed(1)}
-                          onChange={(e) => {
-                            const deg = parseFloat(e.target.value) || 0;
-                            onAngleChange((deg / 360) * 1024);
-                          }}
+                          value={(angle / 1024) * 360}
+                          onChange={(deg) => onAngleChange((deg / 360) * 1024)}
+                          format={(v) => Number(v).toFixed(1)}
                           className="w-20 text-xs font-mono bg-gray-100 px-1 py-0.5 rounded border border-transparent focus:border-purple-500 focus:bg-white text-right outline-none transition-colors"
                         />
                         <span className="text-xs text-gray-500">°</span>
@@ -989,20 +1089,13 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                       スケール / 長さ
                     </label>
                     <div className="flex items-center space-x-1">
-                      <input
-                        type="number"
-                        min="10"
-                        max="1000"
+                      <BufferedNumberInput
+                        minVal={10}
+                        maxVal={1000}
                         step="1"
-                        value={Math.round(length)}
-                        onChange={(e) =>
-                          onLengthChange(
-                            Math.max(
-                              10,
-                              Math.min(1000, parseFloat(e.target.value) || 10),
-                            ),
-                          )
-                        }
+                        value={length}
+                        onChange={onLengthChange}
+                        format={(v) => Math.round(v).toString()}
                         className="w-14 text-xs font-mono bg-gray-100 px-1 py-0.5 rounded border border-transparent focus:border-green-500 focus:bg-white text-right outline-none transition-colors"
                       />
                       <span className="text-xs text-gray-500">px</span>
@@ -1098,22 +1191,18 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   待機時間
                 </label>
                 <div className="flex items-center space-x-2">
-                  <input
-                    type="number"
-                    min="0.1"
+                  <BufferedNumberInput
+                    minVal={0.1}
                     step="0.05"
-                    value={selectedStrokeWait ?? waitDuration}
-                    onChange={(e) => {
-                      // If override is handled by selectedStrokeWait, we use onSelectedStrokeWaitChange
-                      // If no stroke selected (wait type global), we use onWaitDurationChange
+                    value={selectedStrokeWait ?? waitDuration ?? 0.1}
+                    onChange={(val) => {
                       if (selectionType === "wait") {
-                        onSelectedStrokeWaitChange?.(
-                          parseFloat(e.target.value),
-                        );
+                        onSelectedStrokeWaitChange?.(val);
                       } else {
-                        onWaitDurationChange?.(parseFloat(e.target.value));
+                        onWaitDurationChange?.(val);
                       }
                     }}
+                    format={(v) => Number(v).toString()}
                     className="w-full text-sm border-blue-200 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   />
                   <span className="text-xs text-blue-700 font-medium whitespace-nowrap">

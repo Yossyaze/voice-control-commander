@@ -1280,18 +1280,17 @@ function App() {
     const diffRad = (diffRaw / 1024) * 2 * Math.PI;
 
     const start = points[0];
-    const end = points[points.length - 1];
-    const mid = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+    const pivot = { x: start.x, y: start.y };
 
     const cos = Math.cos(diffRad);
     const sin = Math.sin(diffRad);
 
     const newPoints = points.map((p) => {
-      const dx = p.x - mid.x;
-      const dy = p.y - mid.y;
+      const dx = p.x - pivot.x;
+      const dy = p.y - pivot.y;
       return {
-        x: mid.x + (dx * cos - dy * sin),
-        y: mid.y + (dx * sin + dy * cos),
+        x: pivot.x + (dx * cos - dy * sin),
+        y: pivot.y + (dx * sin + dy * cos),
       };
     });
 
