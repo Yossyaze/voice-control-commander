@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { type BackgroundImage } from "../api";
+import { useDialog } from "../contexts/DialogContext";
 
 interface DeviceModel {
   id: string;
@@ -138,6 +139,7 @@ const BufferedNumberInput: React.FC<BufferedNumberInputProps> = ({
 const ControlPanel: React.FC<ControlPanelProps> = ({
   models,
   selectedModelId,
+  // ... other props ... (wait, let's just make sure I don't delete props, I should insert inside the component body, not the props)
   onSelectModel,
   orientation,
   onSelectOrientation,
@@ -188,6 +190,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   exportExtension = ".voicecontrolcom",
   onExportExtensionChange,
 }) => {
+  const { confirm, prompt } = useDialog();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const formatCoord = (n: number) => Math.round(n);
@@ -325,8 +328,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             <div className="flex flex-col space-y-2 bg-blue-50/50 p-2 rounded-md border border-blue-100">
               {/* 新規保存ボタン */}
               <button
-                onClick={() => {
-                  const name = window.prompt(
+                onClick={async () => {
+                  const name = await prompt(
                     "現在の環境設定（端末・縦横）に名前を付けて保存します。",
                   );
                   if (name && name.trim() && onSaveEnvironment) {
@@ -364,12 +367,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                       <div className="flex items-center space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-1">
                         {/* 上書き保存 */}
                         <button
-                          onClick={() => {
-                            if (
-                              window.confirm(
-                                `「${env.name}」を現在の設定で上書きしますか？`,
-                              )
-                            ) {
+                          onClick={async () => {
+                            const confirmed = await confirm(
+                              `「${env.name}」を現在の設定で上書きしますか？`,
+                            );
+                            if (confirmed) {
                               if (onOverwriteEnvironment)
                                 onOverwriteEnvironment(env.id);
                             }
@@ -393,8 +395,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                         </button>
                         {/* リネーム */}
                         <button
-                          onClick={() => {
-                            const newName = window.prompt(
+                          onClick={async () => {
+                            const newName = await prompt(
                               "新しい名前を入力してください:",
                               env.name,
                             );
@@ -427,12 +429,16 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                         {/* 削除 */}
                         <button
                           onClick={() => {
-                            if (
-                              window.confirm(`「${env.name}」を削除しますか？`)
-                            ) {
-                              if (onDeleteEnvironment)
-                                onDeleteEnvironment(env.id);
-                            }
+                            setTimeout(() => {
+                              if (
+                                window.confirm(
+                                  `「${env.name}」を削除しますか？`,
+                                )
+                              ) {
+                                if (onDeleteEnvironment)
+                                  onDeleteEnvironment(env.id);
+                              }
+                            }, 10);
                           }}
                           className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                           title="削除"
@@ -662,13 +668,14 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                           className="object-cover w-full h-full"
                         />
                         <button
-                          onClick={(e) => {
+                          onClick={async (e) => {
                             e.stopPropagation();
-                            if (
-                              onDeleteBackground &&
-                              window.confirm("この背景画像を削除しますか？")
-                            ) {
-                              onDeleteBackground(bg.id);
+                            if (onDeleteBackground) {
+                              const confirmed =
+                                await confirm("この背景画像を削除しますか？");
+                              if (confirmed) {
+                                onDeleteBackground(bg.id);
+                              }
                             }
                           }}
                           className="absolute top-0 right-0 p-0.5 bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity"

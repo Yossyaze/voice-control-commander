@@ -5,6 +5,7 @@ import ControlPanel from "./components/ControlPanel";
 import Sidebar from "./components/Sidebar";
 import AuthStatus from "./components/AuthStatus";
 import { useAuth } from "./contexts/AuthContext";
+import { useDialog } from "./contexts/DialogContext";
 import {
   type Command,
   type Point,
@@ -483,6 +484,8 @@ function saveState<T>(key: string, value: T): void {
 }
 
 function App() {
+  const { confirm, prompt, alert } = useDialog();
+
   // --- 永続化される状態 (localStorage から復元) ---
   const [commands, setCommands] = useState<Command[]>(() =>
     loadState<Command[]>("commands", []),
@@ -556,7 +559,7 @@ function App() {
 
   const handleSaveProject = async () => {
     if (!currentProjectId) {
-      const name = prompt(
+      const name = await prompt(
         "新しいプロジェクト名を入力してください:",
         currentProjectName,
       );
@@ -572,10 +575,10 @@ function App() {
         settings: buildProjectSettings(),
       });
       setSavedCommandsJSON(JSON.stringify(commands));
-      alert("プロジェクトを上書き保存しました");
+      await alert("プロジェクトを上書き保存しました");
     } catch (err) {
       console.error(err);
-      alert("保存に失敗しました");
+      await alert("保存に失敗しました");
     }
   };
 
@@ -584,7 +587,10 @@ function App() {
     const defaultName = currentProjectName
       ? `${currentProjectName} のコピー`
       : "名称未設定プロジェクト";
-    const name = prompt("新しいプロジェクト名を入力してください:", defaultName);
+    const name = await prompt(
+      "新しいプロジェクト名を入力してください:",
+      defaultName,
+    );
     if (!name || !name.trim()) return;
     await handleCreateProject(name.trim());
   };
@@ -592,7 +598,7 @@ function App() {
   const handleLoadProject = async (id: string) => {
     // 未保存の変更がある場合は確認ダイアログを表示
     if (hasUnsavedChanges) {
-      const confirmed = window.confirm(
+      const confirmed = await confirm(
         "現在の編集内容は保存されていません。\nプロジェクトを切り替えますか？",
       );
       if (!confirmed) return;
@@ -639,14 +645,14 @@ function App() {
       }
     } catch (err) {
       console.error(err);
-      alert("読み込みに失敗しました");
+      await alert("読み込みに失敗しました");
     }
   };
 
   const handleDeleteProject = async (id: string) => {
     const project = projectsList.find((p) => p.id === id);
     if (!project) return;
-    const confirmed = window.confirm(
+    const confirmed = await confirm(
       `プロジェクト「${project.name}」を削除しますか？\nこの操作は元に戻せません。`,
     );
     if (!confirmed) return;
@@ -660,14 +666,14 @@ function App() {
       }
     } catch (err) {
       console.error(err);
-      alert("プロジェクトの削除に失敗しました");
+      await alert("プロジェクトの削除に失敗しました");
     }
   };
 
   const handleRenameProject = async (id: string) => {
     const project = projectsList.find((p) => p.id === id);
     if (!project) return;
-    const newName = window.prompt("新しいプロジェクト名:", project.name);
+    const newName = await prompt("新しいプロジェクト名:", project.name);
     if (!newName || !newName.trim() || newName.trim() === project.name) return;
     try {
       await renameProject(id, newName.trim());
@@ -680,7 +686,7 @@ function App() {
       }
     } catch (err) {
       console.error(err);
-      alert("プロジェクト名の変更に失敗しました");
+      await alert("プロジェクト名の変更に失敗しました");
     }
   };
 

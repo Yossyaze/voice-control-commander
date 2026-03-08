@@ -75,57 +75,90 @@ interface SortableStrokeItemProps {
 // Helper to determine if tap
 const isTap = (points: Point[]): boolean => points.length <= 1;
 
-const SortableStrokeItem = ({
-  id,
-  index,
-  stroke,
+const SortableStrokeItem = React.memo(
+  ({
+    id,
+    index,
+    stroke,
+    isSelected,
+    onSelect,
+    onDelete,
+  }: SortableStrokeItemProps) => {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id });
 
-  isSelected,
-  onSelect,
-  onDelete,
-}: SortableStrokeItemProps) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id });
+    const style = {
+      transform: CSS.Translate.toString(transform),
+      transition,
+      zIndex: isDragging ? 999 : "auto",
+      opacity: isDragging ? 0.5 : 1,
+    };
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    zIndex: isDragging ? 999 : "auto",
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`flex items-center justify-between text-xs px-2 py-2 rounded-md cursor-pointer transition-all border mb-1
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className={`flex items-center justify-between text-xs px-2 py-2 rounded-md cursor-pointer transition-colors border mb-1
                 ${
                   isSelected
                     ? "bg-blue-50 border-blue-300 text-blue-900 shadow-sm font-semibold"
                     : "bg-gray-50 border-transparent text-gray-700 hover:bg-gray-100 hover:border-gray-200"
                 }`}
-      onClick={(e) => {
-        e.stopPropagation();
-        onSelect();
-      }}
-    >
-      <div className="flex items-center flex-1 min-w-0">
-        {/* Drag Handle */}
-        <div
-          {...attributes}
-          {...listeners}
-          className="mr-2 cursor-move text-gray-300 hover:text-gray-500 touch-none"
-          onClick={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          onSelect();
+        }}
+      >
+        <div className="flex items-center flex-1 min-w-0">
+          {/* Drag Handle */}
+          <div
+            {...attributes}
+            {...listeners}
+            className="mr-2 cursor-move text-gray-300 hover:text-gray-500 touch-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-3 w-3"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 8h16M4 16h16"
+              />
+            </svg>
+          </div>
+
+          <div
+            className={`w-2 h-2 rounded-full mr-2.5 flex-shrink-0 ${isSelected ? "bg-blue-500 ring-2 ring-blue-200" : "bg-gray-400"}`}
+          ></div>
+          <span>アクション {index + 1}</span>
+          <span className="ml-2 text-[9px] uppercase tracking-wider text-gray-400 bg-white px-1 rounded border border-gray-100 flex-shrink-0">
+            {isTap(stroke) ? "タップ" : "パス"}
+          </span>
+        </div>
+        {/* Delete Stroke Button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          className={`p-1 hover:text-red-500 hover:bg-red-100 rounded transition-colors ml-2 ${isSelected ? "text-blue-400" : "text-gray-400"}`}
+          title="アクションを削除"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            className="h-3 w-3"
+            className="h-3.5 w-3.5"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -134,46 +167,23 @@ const SortableStrokeItem = ({
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
-              d="M4 8h16M4 16h16"
+              d="M6 18L18 6M6 6l12 12"
             />
           </svg>
-        </div>
-
-        <div
-          className={`w-2 h-2 rounded-full mr-2.5 flex-shrink-0 ${isSelected ? "bg-blue-500 ring-2 ring-blue-200" : "bg-gray-400"}`}
-        ></div>
-        <span>アクション {index + 1}</span>
-        <span className="ml-2 text-[9px] uppercase tracking-wider text-gray-400 bg-white px-1 rounded border border-gray-100 flex-shrink-0">
-          {isTap(stroke) ? "タップ" : "パス"}
-        </span>
+        </button>
       </div>
-      {/* Delete Stroke Button */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete();
-        }}
-        className={`p-1 hover:text-red-500 hover:bg-red-100 rounded transition-colors ml-2 ${isSelected ? "text-blue-400" : "text-gray-400"}`}
-        title="アクションを削除"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className="h-3.5 w-3.5"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M6 18L18 6M6 6l12 12"
-          />
-        </svg>
-      </button>
-    </div>
-  );
-};
+    );
+  },
+  (prevProps, nextProps) => {
+    return (
+      prevProps.id === nextProps.id &&
+      prevProps.index === nextProps.index &&
+      prevProps.isSelected === nextProps.isSelected &&
+      prevProps.stroke.length === nextProps.stroke.length &&
+      prevProps.stroke === nextProps.stroke
+    );
+  },
+);
 
 // ----------------------------------------------------------------------------
 // Sortable Command Item
@@ -204,290 +214,296 @@ interface SortableCommandItemProps {
   onToggleMultiSelect: (e: React.MouseEvent) => void;
 }
 
-const SortableCommandItem = ({
-  command,
-  isSelected,
-  editingId,
-  editingName,
-  setEditingName,
-  onStartEditing,
-  onFinishEditing,
-  onSelect,
-  onToggleVisibility,
-  onDelete,
-  onDuplicate,
-  onUpdateCommand,
-  selectedStrokeIndex,
-  selectionType,
-  onSelectStroke,
-  onSelectType,
-  onReorderStrokes,
-  isMultiSelected,
-  onToggleMultiSelect,
-}: SortableCommandItemProps) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: command.id });
+const SortableCommandItem = React.memo(
+  ({
+    command,
+    isSelected,
+    editingId,
+    editingName,
+    setEditingName,
+    onStartEditing,
+    onFinishEditing,
+    onSelect,
+    onToggleVisibility,
+    onDelete,
+    onDuplicate,
+    onUpdateCommand,
+    selectedStrokeIndex,
+    selectionType,
+    onSelectStroke,
+    onSelectType,
+    onReorderStrokes,
+    isMultiSelected,
+    onToggleMultiSelect,
+  }: SortableCommandItemProps) => {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: command.id });
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    zIndex: isDragging ? 999 : "auto",
-    opacity: isDragging ? 0.7 : 1,
-  };
+    const style = {
+      transform: CSS.Translate.toString(transform),
+      transition,
+      zIndex: isDragging ? 999 : "auto",
+      opacity: isDragging ? 0.7 : 1,
+    };
 
-  const inputRef = React.useRef<HTMLInputElement>(null);
-  React.useEffect(() => {
-    if (editingId === command.id && inputRef.current) {
-      inputRef.current.select();
-    }
-  }, [editingId, command.id]);
+    const inputRef = React.useRef<HTMLInputElement>(null);
+    React.useEffect(() => {
+      if (editingId === command.id && inputRef.current) {
+        inputRef.current.select();
+      }
+    }, [editingId, command.id]);
 
-  // Stroke Reordering Logic
-  const strokeSensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    }),
-  );
+    // Stroke Reordering Logic
+    const strokeSensors = useSensors(
+      useSensor(PointerSensor),
+      useSensor(KeyboardSensor, {
+        coordinateGetter: sortableKeyboardCoordinates,
+      }),
+    );
 
-  const handleStrokeDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (over && active.id !== over.id) {
-      // IDs are formatted as "cmdID-strokeID-INDEX" or just "cmdID-INDEX"?
-      // We used "cmdID-stroke-index"
-      // Let's parse index
-      const oldIndex = parseInt(String(active.id).split("-").pop() || "0", 10);
-      const newIndex = parseInt(String(over.id).split("-").pop() || "0", 10);
-      onReorderStrokes(oldIndex, newIndex);
-    }
-  };
+    const handleStrokeDragEnd = (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (over && active.id !== over.id) {
+        // IDs are formatted as "cmdID-strokeID-INDEX" or just "cmdID-INDEX"?
+        // We used "cmdID-stroke-index"
+        // Let's parse index
+        const oldIndex = parseInt(
+          String(active.id).split("-").pop() || "0",
+          10,
+        );
+        const newIndex = parseInt(String(over.id).split("-").pop() || "0", 10);
+        onReorderStrokes(oldIndex, newIndex);
+      }
+    };
 
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`rounded-md border shadow-sm transition-all overflow-hidden mb-2 ${isSelected ? "border-blue-400 bg-white ring-1 ring-blue-100" : "border-gray-300 bg-white hover:border-gray-300"}`}
-    >
-      {/* Command Header */}
+    return (
       <div
-        className={`flex flex-col px-3 py-2 cursor-pointer transition-colors group/item ${isSelected ? "bg-blue-50" : "hover:bg-gray-50"}`}
-        onClick={onSelect}
+        ref={setNodeRef}
+        style={style}
+        className={`rounded-md border shadow-sm transition-colors overflow-hidden mb-2 ${isSelected ? "border-blue-400 bg-white ring-1 ring-blue-100" : "border-gray-300 bg-white hover:border-gray-300"}`}
       >
-        {/* Row 1: Name and Color */}
-        <div className="flex items-center mb-1.5 min-w-0">
-          {/* Drag Handle */}
-          <div
-            {...attributes}
-            {...listeners}
-            className="mr-2 cursor-move text-gray-300 hover:text-gray-500 touch-none flex-shrink-0"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+        {/* Command Header */}
+        <div
+          className={`flex flex-col px-3 py-2 cursor-pointer transition-colors group/item ${isSelected ? "bg-blue-50" : "hover:bg-gray-50"}`}
+          onClick={onSelect}
+        >
+          {/* Row 1: Name and Color */}
+          <div className="flex items-center mb-1.5 min-w-0">
+            {/* Drag Handle */}
+            <div
+              {...attributes}
+              {...listeners}
+              className="mr-2 cursor-move text-gray-300 hover:text-gray-500 touch-none flex-shrink-0"
+              onClick={(e) => e.stopPropagation()}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 8h16M4 16h16"
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 8h16M4 16h16"
+                />
+              </svg>
+            </div>
+
+            {/* Checkbox for Multi-select */}
+            <div
+              className="mr-2 flex-shrink-0 cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleMultiSelect(e);
+              }}
+            >
+              <div
+                className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${isMultiSelected ? "bg-blue-500 border-blue-500" : "bg-white border-gray-300 hover:border-blue-400"}`}
+              >
+                {isMultiSelected && (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-3 w-3 text-white"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                )}
+              </div>
+            </div>
+
+            {/* Color Indicator */}
+            <div
+              className="w-2.5 h-2.5 rounded-full mr-2.5 ring-1 ring-black/10 flex-shrink-0 shadow-sm"
+              style={{ backgroundColor: command.color }}
+            />
+
+            {/* Name */}
+            {editingId === command.id ? (
+              <input
+                ref={inputRef}
+                type="text"
+                value={editingName}
+                onChange={(e) => setEditingName(e.target.value)}
+                onBlur={onFinishEditing}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                    onFinishEditing();
+                  }
+                }}
+                className="text-sm font-bold w-full border border-blue-500 rounded px-1.5 py-0.5 -ml-1.5 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                onClick={(e) => e.stopPropagation()}
               />
-            </svg>
+            ) : (
+              <span
+                className={`text-sm font-bold truncate flex-1 ${isSelected ? "text-blue-900" : "text-gray-800"}`}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  onStartEditing(command.id, command.name);
+                }}
+                title={command.name}
+              >
+                {command.name}
+              </span>
+            )}
           </div>
 
-          {/* Checkbox for Multi-select */}
-          <div
-            className="mr-2 flex-shrink-0 cursor-pointer"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleMultiSelect(e);
-            }}
-          >
-            <div
-              className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${isMultiSelected ? "bg-blue-500 border-blue-500" : "bg-white border-gray-300 hover:border-blue-400"}`}
-            >
-              {isMultiSelected && (
+          {/* Row 2: Controls and Info */}
+          <div className="flex items-center justify-between pl-8">
+            <div className="flex items-center space-x-3">
+              {/* Visibility Toggle */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleVisibility();
+                }}
+                className={`focus:outline-none transition-colors flex items-center space-x-1 ${command.isVisible ? "text-gray-500 hover:text-blue-600" : "text-gray-300"}`}
+                title={command.isVisible ? "非表示" : "表示"}
+              >
+                {command.isVisible ? (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-3.5 w-3.5"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                    <path
+                      fillRule="evenodd"
+                      d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-3.5 w-3.5"
+                    xmlnsXlink="http://www.w3.org/1999/xlink"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z"
+                      clipRule="evenodd"
+                    />
+                    <path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.064 7 9.542 7 .847 0 1.669-.105 2.454-.303z" />
+                  </svg>
+                )}
+                <span className="text-[10px]">表示中</span>
+              </button>
+
+              <span className="text-[10px] text-gray-400 font-mono bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
+                {command.strokes.length} ステップ
+              </span>
+            </div>
+
+            <div className="flex items-center space-x-1">
+              {/* Duplicate Button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDuplicate();
+                }}
+                className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded p-1 transition-colors"
+                title="コマンドを複製"
+              >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-3 w-3 text-white"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
                 >
                   <path
-                    fillRule="evenodd"
-                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                    clipRule="evenodd"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"
                   />
                 </svg>
-              )}
+              </button>
+
+              {/* Delete Button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+                className="text-gray-400 hover:text-red-600 hover:bg-red-50 rounded p-1 transition-colors"
+                title="コマンドを削除"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                  />
+                </svg>
+              </button>
             </div>
           </div>
-
-          {/* Color Indicator */}
-          <div
-            className="w-2.5 h-2.5 rounded-full mr-2.5 ring-1 ring-black/10 flex-shrink-0 shadow-sm"
-            style={{ backgroundColor: command.color }}
-          />
-
-          {/* Name */}
-          {editingId === command.id ? (
-            <input
-              ref={inputRef}
-              type="text"
-              value={editingName}
-              onChange={(e) => setEditingName(e.target.value)}
-              onBlur={onFinishEditing}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                  onFinishEditing();
-                }
-              }}
-              className="text-sm font-bold w-full border border-blue-500 rounded px-1.5 py-0.5 -ml-1.5 focus:outline-none focus:ring-2 focus:ring-blue-200"
-              onClick={(e) => e.stopPropagation()}
-            />
-          ) : (
-            <span
-              className={`text-sm font-bold truncate flex-1 ${isSelected ? "text-blue-900" : "text-gray-800"}`}
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-                onStartEditing(command.id, command.name);
-              }}
-              title={command.name}
-            >
-              {command.name}
-            </span>
-          )}
         </div>
 
-        {/* Row 2: Controls and Info */}
-        <div className="flex items-center justify-between pl-8">
-          <div className="flex items-center space-x-3">
-            {/* Visibility Toggle */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleVisibility();
-              }}
-              className={`focus:outline-none transition-colors flex items-center space-x-1 ${command.isVisible ? "text-gray-500 hover:text-blue-600" : "text-gray-300"}`}
-              title={command.isVisible ? "非表示" : "表示"}
+        {/* Detailed Stroke List (Only if selected) */}
+        {isSelected && (
+          <div className="bg-white border-t border-blue-100 pl-4 pr-3 py-2">
+            {/* Nested Dnd Context for Strokes */}
+            <DndContext
+              sensors={strokeSensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleStrokeDragEnd}
             >
-              {command.isVisible ? (
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-3.5 w-3.5"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                  <path
-                    fillRule="evenodd"
-                    d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              ) : (
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-3.5 w-3.5"
-                  xmlnsXlink="http://www.w3.org/1999/xlink"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z"
-                    clipRule="evenodd"
-                  />
-                  <path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.064 7 9.542 7 .847 0 1.669-.105 2.454-.303z" />
-                </svg>
-              )}
-              <span className="text-[10px]">表示中</span>
-            </button>
-
-            <span className="text-[10px] text-gray-400 font-mono bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
-              {command.strokes.length} ステップ
-            </span>
-          </div>
-
-          <div className="flex items-center space-x-1">
-            {/* Duplicate Button */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDuplicate();
-              }}
-              className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded p-1 transition-colors"
-              title="コマンドを複製"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
+              <SortableContext
+                items={command.strokes.map(
+                  (_, i) => `${command.id}-stroke-${i}`,
+                )}
+                strategy={verticalListSortingStrategy}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"
-                />
-              </svg>
-            </button>
-
-            {/* Delete Button */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete();
-              }}
-              className="text-gray-400 hover:text-red-600 hover:bg-red-50 rounded p-1 transition-colors"
-              title="コマンドを削除"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Detailed Stroke List (Only if selected) */}
-      {isSelected && (
-        <div className="bg-white border-t border-blue-100 pl-4 pr-3 py-2">
-          {/* Nested Dnd Context for Strokes */}
-          <DndContext
-            sensors={strokeSensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleStrokeDragEnd}
-          >
-            <SortableContext
-              items={command.strokes.map((_, i) => `${command.id}-stroke-${i}`)}
-              strategy={verticalListSortingStrategy}
-            >
-              {command.strokes.map((stroke, index) => (
-                <React.Fragment key={`${command.id}-stroke-${index}`}>
-                  {/* Wait (Gap) - Should we make wait sortable? No, wait belongs to the stroke after it or before it? 
+                {command.strokes.map((stroke, index) => (
+                  <React.Fragment key={`${command.id}-stroke-${index}`}>
+                    {/* Wait (Gap) - Should we make wait sortable? No, wait belongs to the stroke after it or before it? 
                                         In previous implementation, wait was "between" strokes. 
                                         Actually logic: Wait is metadata for a stroke (waitAfter). 
                                         Or wait is visual gap. 
@@ -513,126 +529,138 @@ const SortableCommandItem = ({
                                         Let's just render the "Wait" block above the stroke if index > 0.
                                         This "Wait" block is technically associated with (index-1), but visualized here.
                                     */}
-                  {index > 0 && (
-                    <div
-                      className={`flex items-center justify-center py-1 cursor-pointer group/wait relative my-1 rounded
-                                                ${selectedStrokeIndex === index - 1 && selectionType === "wait" ? "bg-blue-50 opacity-100 ring-1 ring-blue-200" : "opacity-60 hover:opacity-100 hover:bg-gray-50"}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSelectStroke(index - 1);
-                        onSelectType?.("wait");
-                      }}
-                    >
+                    {index > 0 && (
                       <div
-                        className={`h-3 w-[2px] rounded-full ${selectedStrokeIndex === index - 1 && selectionType === "wait" ? "bg-blue-500" : "bg-gray-300"}`}
-                      ></div>
-                      <span
-                        className={`text-[10px] ml-2 ${selectedStrokeIndex === index - 1 && selectionType === "wait" ? "text-blue-700 font-bold" : "text-gray-500"}`}
+                        className={`flex items-center justify-center py-1 cursor-pointer group/wait relative my-1 rounded
+                                                ${selectedStrokeIndex === index - 1 && selectionType === "wait" ? "bg-blue-50 opacity-100 ring-1 ring-blue-200" : "opacity-60 hover:opacity-100 hover:bg-gray-50"}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectStroke(index - 1);
+                          onSelectType?.("wait");
+                        }}
                       >
-                        待機{" "}
-                        {command.strokeMetadata?.[index - 1]?.waitAfter ??
-                          command.waitDuration ??
-                          0.2}
-                        秒
-                      </span>
-                    </div>
-                  )}
+                        <div
+                          className={`h-3 w-[2px] rounded-full ${selectedStrokeIndex === index - 1 && selectionType === "wait" ? "bg-blue-500" : "bg-gray-300"}`}
+                        ></div>
+                        <span
+                          className={`text-[10px] ml-2 ${selectedStrokeIndex === index - 1 && selectionType === "wait" ? "text-blue-700 font-bold" : "text-gray-500"}`}
+                        >
+                          待機{" "}
+                          {command.strokeMetadata?.[index - 1]?.waitAfter ??
+                            command.waitDuration ??
+                            0.2}
+                          秒
+                        </span>
+                      </div>
+                    )}
 
-                  <SortableStrokeItem
-                    id={`${command.id}-stroke-${index}`}
-                    index={index}
-                    stroke={stroke}
-                    isSelected={
-                      selectedStrokeIndex === index &&
-                      selectionType === "stroke"
-                    }
-                    onSelect={() => {
-                      onSelectStroke(index);
-                      onSelectType?.("stroke");
-                    }}
-                    onDelete={() => {
-                      const newStrokes = [...command.strokes];
-                      newStrokes.splice(index, 1);
-                      onUpdateCommand({ ...command, strokes: newStrokes });
-                      if (selectedStrokeIndex === index) onSelectStroke(null);
-                      else if (
-                        selectedStrokeIndex !== null &&
-                        index < selectedStrokeIndex
-                      )
-                        onSelectStroke(selectedStrokeIndex - 1);
-                    }}
+                    <SortableStrokeItem
+                      id={`${command.id}-stroke-${index}`}
+                      index={index}
+                      stroke={stroke}
+                      isSelected={
+                        selectedStrokeIndex === index &&
+                        selectionType === "stroke"
+                      }
+                      onSelect={() => {
+                        onSelectStroke(index);
+                        onSelectType?.("stroke");
+                      }}
+                      onDelete={() => {
+                        const newStrokes = [...command.strokes];
+                        newStrokes.splice(index, 1);
+                        onUpdateCommand({ ...command, strokes: newStrokes });
+                        if (selectedStrokeIndex === index) onSelectStroke(null);
+                        else if (
+                          selectedStrokeIndex !== null &&
+                          index < selectedStrokeIndex
+                        )
+                          onSelectStroke(selectedStrokeIndex - 1);
+                      }}
+                    />
+                  </React.Fragment>
+                ))}
+              </SortableContext>
+            </DndContext>
+
+            {/* Add Action Buttons */}
+            <div className="pt-3 pb-1 flex justify-center space-x-2 border-t border-dashed border-gray-200 mt-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Default horizontal stroke
+                  const newStroke: Point[] = Array(24)
+                    .fill(0)
+                    .map((_, i) => ({ x: 100, y: 400 + i * 5 }));
+                  onUpdateCommand({
+                    ...command,
+                    strokes: [...command.strokes, newStroke],
+                  });
+                }}
+                className="flex-1 px-2 py-1.5 text-[10px] font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded flex items-center justify-center transition-colors shadow-sm"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-3 w-3 mr-1.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 5l7 7-7 7M5 5l7 7-7 7"
                   />
-                </React.Fragment>
-              ))}
-            </SortableContext>
-          </DndContext>
-
-          {/* Add Action Buttons */}
-          <div className="pt-3 pb-1 flex justify-center space-x-2 border-t border-dashed border-gray-200 mt-2">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                // Default horizontal stroke
-                const newStroke: Point[] = Array(24)
-                  .fill(0)
-                  .map((_, i) => ({ x: 100, y: 400 + i * 5 }));
-                onUpdateCommand({
-                  ...command,
-                  strokes: [...command.strokes, newStroke],
-                });
-              }}
-              className="flex-1 px-2 py-1.5 text-[10px] font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded flex items-center justify-center transition-colors shadow-sm"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-3 w-3 mr-1.5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
+                </svg>
+                + 線を描く
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Tap point
+                  const newTap: Point[] = [{ x: 160, y: 400 }];
+                  onUpdateCommand({
+                    ...command,
+                    strokes: [...command.strokes, newTap],
+                  });
+                }}
+                className="flex-1 px-2 py-1.5 text-[10px] font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded flex items-center justify-center transition-colors shadow-sm"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 5l7 7-7 7M5 5l7 7-7 7"
-                />
-              </svg>
-              + 線を描く
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                // Tap point
-                const newTap: Point[] = [{ x: 160, y: 400 }];
-                onUpdateCommand({
-                  ...command,
-                  strokes: [...command.strokes, newTap],
-                });
-              }}
-              className="flex-1 px-2 py-1.5 text-[10px] font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded flex items-center justify-center transition-colors shadow-sm"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-3 w-3 mr-1.5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"
-                />
-              </svg>
-              + タップ
-            </button>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-3 w-3 mr-1.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"
+                  />
+                </svg>
+                + タップ
+              </button>
+            </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
-};
+        )}
+      </div>
+    );
+  },
+  (prevProps, nextProps) => {
+    return (
+      prevProps.command === nextProps.command &&
+      prevProps.isSelected === nextProps.isSelected &&
+      prevProps.isMultiSelected === nextProps.isMultiSelected &&
+      prevProps.editingId === nextProps.editingId &&
+      prevProps.editingName === nextProps.editingName &&
+      prevProps.selectedStrokeIndex === nextProps.selectedStrokeIndex &&
+      prevProps.selectionType === nextProps.selectionType
+    );
+  },
+);
 
 // ----------------------------------------------------------------------------
 // Main Sidebar Component
