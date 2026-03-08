@@ -270,7 +270,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   // ------------------------------------
 
   return (
-    <div className="w-72 bg-white flex flex-col h-full border-l border-gray-200 font-sans shadow-xl z-20 overflow-hidden">
+    <div className="w-full bg-white flex flex-col h-full font-sans z-20 overflow-hidden">
       {/* Header */}
       <div className="h-12 px-4 border-b border-gray-200 bg-white flex justify-between items-center flex-shrink-0">
         <h2 className="text-xs font-bold text-gray-500 tracking-wider uppercase">

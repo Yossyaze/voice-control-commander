@@ -806,10 +806,10 @@ function App() {
   }, [exportExtension]);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState<boolean>(() =>
-    loadState<boolean>("isLeftSidebarOpen", true),
+    loadState<boolean>("isLeftSidebarOpen", window.innerWidth >= 768),
   );
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState<boolean>(() =>
-    loadState<boolean>("isRightSidebarOpen", true),
+    loadState<boolean>("isRightSidebarOpen", window.innerWidth >= 768),
   );
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
@@ -2381,11 +2381,18 @@ function App() {
       className="flex h-screen bg-gray-50 overflow-hidden font-sans text-gray-900"
       ref={appRef}
     >
+      {/* Mobile Drawer Overlay for Left Sidebar */}
+      {!isFullscreen && isLeftSidebarOpen && (
+        <div
+          className="md:hidden fixed inset-0 bg-black/20 z-40 transition-opacity"
+          onClick={() => setIsLeftSidebarOpen(false)}
+        />
+      )}
       {/* Left Sidebar */}
       <div
         className={`
             ${isLeftSidebarOpen ? "w-64" : "w-0"} 
-            ${isFullscreen ? "absolute left-0 z-50 h-full shadow-2xl" : "relative"}
+            ${isFullscreen ? "absolute left-0 z-50 h-full shadow-2xl" : "fixed md:relative left-0 z-50 md:z-auto h-full shadow-2xl md:shadow-none"}
             transition-all duration-300 ease-in-out flex-shrink-0 bg-white border-r border-gray-200 overflow-hidden
         `}
       >
@@ -2538,11 +2545,14 @@ function App() {
                   }
                 </svg>
               </button>
-              <h1 className="font-semibold text-gray-700 tracking-tight">
+              <h1 className="font-semibold text-gray-700 tracking-tight hidden sm:block">
                 Voice Control Commander
               </h1>
+              <h1 className="font-semibold text-gray-700 tracking-tight sm:hidden text-xs truncate max-w-[100px]">
+                VCC
+              </h1>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-1 md:space-x-3">
               {/* Undo / Redo */}
               <div className="flex items-center space-x-1">
                 <button
@@ -2620,9 +2630,30 @@ function App() {
               <div className="h-4 w-px bg-gray-300 mx-1" />
               <button
                 onClick={handleExportAll}
-                className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 shadow-sm transition-colors"
+                className="hidden md:block px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 shadow-sm transition-colors"
+                title="全コマンドを書き出す"
               >
                 全コマンドを書き出す
+              </button>
+              <button
+                onClick={handleExportAll}
+                className="md:hidden p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
+                title="全コマンドを書き出す"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                  />
+                </svg>
               </button>
             </div>
           </div>
@@ -2766,113 +2797,150 @@ function App() {
         </div>
       </div>
 
+      {/* Mobile Overlay for Right Sidebar */}
+      {!isFullscreen && isRightSidebarOpen && (
+        <div
+          className="md:hidden fixed inset-0 bg-black/20 z-40 transition-opacity"
+          onClick={() => setIsRightSidebarOpen(false)}
+        />
+      )}
       {/* Right Sidebar (Control Panel) */}
       <div
         className={`
-            ${isRightSidebarOpen ? "w-72" : "w-0"} 
-            ${isFullscreen ? "absolute right-0 z-50 h-full shadow-2xl" : "relative"}
-            transition-all duration-300 ease-in-out flex-shrink-0 bg-white border-l border-gray-200 overflow-hidden
+            ${isFullscreen ? "absolute right-0 z-50 h-full shadow-2xl md:rounded-none" : "fixed bottom-0 left-0 right-0 md:relative md:bottom-auto md:left-auto md:right-0 z-50 md:z-auto shadow-[0_-10px_40px_rgba(0,0,0,0.1)] md:shadow-none"}
+            ${
+              isRightSidebarOpen
+                ? "w-full md:w-72 h-[75vh] md:h-full translate-y-0 md:translate-y-0"
+                : "w-full md:w-0 h-[75vh] md:h-full translate-y-full md:translate-y-0"
+            }
+            transition-all duration-300 ease-out flex-shrink-0 bg-white border-t md:border-t-0 md:border-l border-gray-200 overflow-hidden rounded-t-2xl md:rounded-none flex flex-col
         `}
       >
-        <ControlPanel
-          models={DEVICE_MODELS}
-          selectedModelId={selectedModelId}
-          onSelectModel={setSelectedModelId}
-          orientation={orientation}
-          onSelectOrientation={setOrientation}
-          scale={scale}
-          onScaleChange={handleScaleChange}
-          onNudge={(dx, dy) => {
-            if (dx !== 0) handleNudge("x", dx);
-            if (dy !== 0) handleNudge("y", dy);
-          }}
-          onExport={handleExportSelected}
-          onBackgroundImageUpload={handleBackgroundImageUpload}
-          onBackgroundImageSelect={(url) => setBackgroundImage(url)}
-          onClearBackgroundImage={handleClearBackgroundImage}
-          backgroundsList={backgroundsList}
-          onDeleteBackground={handleDeleteBackground}
-          showGrid={showGrid}
-          onToggleGrid={() => setShowGrid(!showGrid)}
-          showPoints={showPoints}
-          onTogglePoints={() => setShowPoints(!showPoints)}
-          selectedCommandShowPoints={
-            selectedCommand ? selectedCommand.showPoints : undefined
-          }
-          onToggleCommandPoints={(show) => {
-            if (activeCommandId) {
-              setCommands((prev) =>
-                prev.map((cmd) =>
-                  cmd.id === activeCommandId
-                    ? { ...cmd, showPoints: show }
-                    : cmd,
-                ),
-              );
-            }
-          }}
-          onEnterFullscreen={handleToggleFullscreen}
-          isFullscreen={isFullscreen}
-          duration={displayDuration}
-          onDurationChange={handleDurationChange}
-          isPlaying={isPlaying}
-          onTogglePlay={togglePlay}
-          angle={currentAngle}
-          onAngleChange={handleAngleChange}
-          length={currentLength}
-          onLengthChange={(newLen) => {
-            if (selectedStrokeIndex !== null) {
-              const points = getSelectedStrokePoints();
-              if (!points || points.length < 2) return;
-              const currentLen = calculateLength(points);
-              if (currentLen === 0) return;
+        {/* Mobile Bottom Sheet Handle & Close Button */}
+        <div
+          className="w-full flex justify-center pt-3 pb-2 md:hidden cursor-pointer shrink-0 relative"
+          onClick={() => setIsRightSidebarOpen(false)}
+        >
+          <div className="w-12 h-1.5 bg-gray-300 rounded-full"></div>
+          <button className="absolute right-4 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 bg-gray-100 rounded-full">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
 
-              const scaleFactor = newLen / currentLen;
-              const start = points[0];
-              const end = points[points.length - 1];
-              const mid = {
-                x: (start.x + end.x) / 2,
-                y: (start.y + end.y) / 2,
-              };
-
-              const newPoints = points.map((p) => ({
-                x: mid.x + (p.x - mid.x) * scaleFactor,
-                y: mid.y + (p.y - mid.y) * scaleFactor,
-              }));
-              updateSelectedStroke(newPoints);
+        <div className="flex-1 overflow-hidden">
+          <ControlPanel
+            models={DEVICE_MODELS}
+            selectedModelId={selectedModelId}
+            onSelectModel={setSelectedModelId}
+            orientation={orientation}
+            onSelectOrientation={setOrientation}
+            scale={scale}
+            onScaleChange={handleScaleChange}
+            onNudge={(dx, dy) => {
+              if (dx !== 0) handleNudge("x", dx);
+              if (dy !== 0) handleNudge("y", dy);
+            }}
+            onExport={handleExportSelected}
+            onBackgroundImageUpload={handleBackgroundImageUpload}
+            onBackgroundImageSelect={(url) => setBackgroundImage(url)}
+            onClearBackgroundImage={handleClearBackgroundImage}
+            backgroundsList={backgroundsList}
+            onDeleteBackground={handleDeleteBackground}
+            showGrid={showGrid}
+            onToggleGrid={() => setShowGrid(!showGrid)}
+            showPoints={showPoints}
+            onTogglePoints={() => setShowPoints(!showPoints)}
+            selectedCommandShowPoints={
+              selectedCommand ? selectedCommand.showPoints : undefined
             }
-          }}
-          onCurve={handleCurve}
-          onStraight={handleMakeStraight}
-          onFlip={handleFlip}
-          absoluteX={currentHeadX}
-          absoluteY={currentHeadY}
-          isActionSelected={selectedStrokeIndex !== null}
-          waitDuration={
-            selectedCommand?.waitDuration !== undefined
-              ? selectedCommand.waitDuration
-              : 0.1
-          }
-          onWaitDurationChange={handleWaitDurationChange}
-          selectedStrokeWait={currentStrokeWait}
-          onSelectedStrokeWaitChange={handleSelectedStrokeWaitChange}
-          selectionType={selectionType}
-          onDeleteSelectedAction={handleDeleteSelectedAction}
-          onFlipAngle={
-            selectedStrokeIndex !== null &&
-            selectedCommand &&
-            selectedCommand.strokes[selectedStrokeIndex]?.length > 1
-              ? handleFlipAngle
-              : undefined
-          }
-          favoriteEnvironments={favoriteEnvironments}
-          onSaveEnvironment={handleSaveEnvironment}
-          onLoadEnvironment={handleLoadEnvironment}
-          onRenameEnvironment={handleRenameEnvironment}
-          onOverwriteEnvironment={handleOverwriteEnvironment}
-          onDeleteEnvironment={handleDeleteEnvironment}
-          exportExtension={exportExtension}
-          onExportExtensionChange={setExportExtension}
-        />
+            onToggleCommandPoints={(show) => {
+              if (activeCommandId) {
+                setCommands((prev) =>
+                  prev.map((cmd) =>
+                    cmd.id === activeCommandId
+                      ? { ...cmd, showPoints: show }
+                      : cmd,
+                  ),
+                );
+              }
+            }}
+            onEnterFullscreen={handleToggleFullscreen}
+            isFullscreen={isFullscreen}
+            duration={displayDuration}
+            onDurationChange={handleDurationChange}
+            isPlaying={isPlaying}
+            onTogglePlay={togglePlay}
+            angle={currentAngle}
+            onAngleChange={handleAngleChange}
+            length={currentLength}
+            onLengthChange={(newLen) => {
+              if (selectedStrokeIndex !== null) {
+                const points = getSelectedStrokePoints();
+                if (!points || points.length < 2) return;
+                const currentLen = calculateLength(points);
+                if (currentLen === 0) return;
+
+                const scaleFactor = newLen / currentLen;
+                const start = points[0];
+                const end = points[points.length - 1];
+                const mid = {
+                  x: (start.x + end.x) / 2,
+                  y: (start.y + end.y) / 2,
+                };
+
+                const newPoints = points.map((p) => ({
+                  x: mid.x + (p.x - mid.x) * scaleFactor,
+                  y: mid.y + (p.y - mid.y) * scaleFactor,
+                }));
+                updateSelectedStroke(newPoints);
+              }
+            }}
+            onCurve={handleCurve}
+            onStraight={handleMakeStraight}
+            onFlip={handleFlip}
+            absoluteX={currentHeadX}
+            absoluteY={currentHeadY}
+            isActionSelected={selectedStrokeIndex !== null}
+            waitDuration={
+              selectedCommand?.waitDuration !== undefined
+                ? selectedCommand.waitDuration
+                : 0.1
+            }
+            onWaitDurationChange={handleWaitDurationChange}
+            selectedStrokeWait={currentStrokeWait}
+            onSelectedStrokeWaitChange={handleSelectedStrokeWaitChange}
+            selectionType={selectionType}
+            onDeleteSelectedAction={handleDeleteSelectedAction}
+            onFlipAngle={
+              selectedStrokeIndex !== null &&
+              selectedCommand &&
+              selectedCommand.strokes[selectedStrokeIndex]?.length > 1
+                ? handleFlipAngle
+                : undefined
+            }
+            favoriteEnvironments={favoriteEnvironments}
+            onSaveEnvironment={handleSaveEnvironment}
+            onLoadEnvironment={handleLoadEnvironment}
+            onRenameEnvironment={handleRenameEnvironment}
+            onOverwriteEnvironment={handleOverwriteEnvironment}
+            onDeleteEnvironment={handleDeleteEnvironment}
+            exportExtension={exportExtension}
+            onExportExtensionChange={setExportExtension}
+          />
+        </div>
         {/* Close button for fullscreen popup mode */}
         {isFullscreen && isRightSidebarOpen && (
           <button
