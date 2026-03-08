@@ -548,7 +548,7 @@ const SortableCommandItem = React.memo(
                           待機{" "}
                           {command.strokeMetadata?.[index - 1]?.waitAfter ??
                             command.waitDuration ??
-                            0.2}
+                            0.1}
                           秒
                         </span>
                       </div>

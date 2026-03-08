@@ -738,7 +738,7 @@ export function createGestureData(
     const stroke = strokes[strokeIndex];
 
     if (strokeIndex > 0) {
-      let waitTime = 0.2;
+      let waitTime = 0.1;
       if (waits && strokeIndex - 1 < waits.length) {
         waitTime = waits[strokeIndex - 1];
       }

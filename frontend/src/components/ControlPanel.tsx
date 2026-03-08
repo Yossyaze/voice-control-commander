@@ -1219,14 +1219,14 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 <div className="flex justify-end space-x-1 mt-2">
                   <button
                     onClick={() => {
-                      const val = 0.2;
+                      const val = 0.1;
                       if (selectionType === "wait")
                         onSelectedStrokeWaitChange?.(val);
                       else onWaitDurationChange?.(val);
                     }}
                     className="px-2 py-1 text-[10px] bg-white hover:bg-blue-100 rounded text-blue-600 border border-blue-200"
                   >
-                    デフォルト (0.2秒)
+                    デフォルト (0.1秒)
                   </button>
                 </div>
               </div>
@@ -1276,7 +1276,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   clipRule="evenodd"
                 />
               </svg>
-              {isActionSelected ? "アクション再生" : "全再生"}
+              再生
             </>
           )}
         </button>

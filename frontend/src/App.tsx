@@ -946,40 +946,27 @@ function App() {
         strokeIndex?: number;
       }[] = [];
 
-      if (
-        selectedStrokeIndex !== null &&
-        selectedStrokeIndex < selectedCommand.strokes.length
-      ) {
-        // Play ONLY the selected stroke
-        const s = selectedCommand.strokes[selectedStrokeIndex];
+      // Play ALL strokes in sequence
+      const waitTime =
+        selectedCommand.waitDuration !== undefined
+          ? selectedCommand.waitDuration
+          : 0.1;
+      selectedCommand.strokes.forEach((s, i) => {
+        if (i > 0) {
+          // Wait time BEFORE stroke i.
+          // Which is "Wait After" stroke i-1.
+          const prevStrokeWait =
+            selectedCommand.strokeMetadata?.[i - 1]?.waitAfter;
+          const actualWait =
+            prevStrokeWait !== undefined ? prevStrokeWait : waitTime;
+          timeline.push({ type: "wait", duration: actualWait });
+        }
         timeline.push({
           type: "stroke",
           duration: Math.max(0.1, s.length / 60),
-          strokeIndex: selectedStrokeIndex,
+          strokeIndex: i,
         });
-      } else {
-        // Play ALL strokes in sequence
-        const waitTime =
-          selectedCommand.waitDuration !== undefined
-            ? selectedCommand.waitDuration
-            : 0.2;
-        selectedCommand.strokes.forEach((s, i) => {
-          if (i > 0) {
-            // Wait time BEFORE stroke i.
-            // Which is "Wait After" stroke i-1.
-            const prevStrokeWait =
-              selectedCommand.strokeMetadata?.[i - 1]?.waitAfter;
-            const actualWait =
-              prevStrokeWait !== undefined ? prevStrokeWait : waitTime;
-            timeline.push({ type: "wait", duration: actualWait });
-          }
-          timeline.push({
-            type: "stroke",
-            duration: Math.max(0.1, s.length / 60),
-            strokeIndex: i,
-          });
-        });
-      }
+      });
 
       const totalDuration = timeline.reduce(
         (acc, item) => acc + item.duration,
@@ -1131,7 +1118,7 @@ function App() {
   const handleCreateNewCommand = () => {
     saveToHistory();
     const newId = crypto.randomUUID();
-    const initialPoints = resamplePath(DEFAULT_COMMAND_POINTS, 0.4);
+    const initialPoints = resamplePath(DEFAULT_COMMAND_POINTS, 0.42);
 
     // Create new command with one stroke
     const newCommand: Command = {
@@ -1140,8 +1127,8 @@ function App() {
       points: initialPoints, // Legacy support, keeps sync with first stroke
       strokes: [initialPoints],
       isVisible: true,
-      duration: 0.4,
-      waitDuration: 0.2, // Default wait duration
+      duration: 0.42,
+      waitDuration: 0.1, // Default wait duration
       color: getNextColor(commands), // Assign color to command
     };
 
@@ -1533,14 +1520,14 @@ function App() {
       ) {
         // Specific stroke
         const s = selectedCommand.strokes[selectedStrokeIndex];
-        // Allow shorter durations like 0.2s. Min 0.1s for safety.
+        // Allow shorter durations like 0.1s. Min 0.1s for safety.
         return Math.max(0.05, Math.round((s.length / 60) * 100) / 100);
       } else {
         // Total sequential time: Sum(strokes) + Sum(gaps)
         const waitTime =
           selectedCommand.waitDuration !== undefined
             ? selectedCommand.waitDuration
-            : 0.2;
+            : 0.1;
         let total = 0;
         selectedCommand.strokes.forEach((s, i) => {
           if (i > 0) total += waitTime;
@@ -1658,7 +1645,7 @@ function App() {
     const waitTime =
       selectedCommand.waitDuration !== undefined
         ? selectedCommand.waitDuration
-        : 0.2;
+        : 0.1;
 
     for (let i = 0; i < selectedCommand.strokes.length - 1; i++) {
       const strokeA = selectedCommand.strokes[i];
@@ -1692,7 +1679,7 @@ function App() {
 
     const commandsToExport = commands.map((cmd) => {
       const strokeWaits = cmd.strokes.map(
-        (_, i) => cmd.strokeMetadata?.[i]?.waitAfter ?? cmd.waitDuration ?? 0.2,
+        (_, i) => cmd.strokeMetadata?.[i]?.waitAfter ?? cmd.waitDuration ?? 0.1,
       );
       return {
         name: cmd.name,
@@ -1748,7 +1735,7 @@ function App() {
     if (!cmd) return;
 
     const strokeWaits = cmd.strokes.map(
-      (_, i) => cmd.strokeMetadata?.[i]?.waitAfter ?? cmd.waitDuration ?? 0.2,
+      (_, i) => cmd.strokeMetadata?.[i]?.waitAfter ?? cmd.waitDuration ?? 0.1,
     );
 
     const commandToExport = {
@@ -1818,7 +1805,7 @@ function App() {
 
         const strokeWaits = cmd.strokes.map(
           (_, i) =>
-            cmd.strokeMetadata?.[i]?.waitAfter ?? cmd.waitDuration ?? 0.2,
+            cmd.strokeMetadata?.[i]?.waitAfter ?? cmd.waitDuration ?? 0.1,
         );
 
         return {
@@ -2159,7 +2146,7 @@ function App() {
 
               if (newPoints.length) {
                 const currentPointsCount = stroke.length;
-                const currentDuration = Math.max(0.4, currentPointsCount / 60);
+                const currentDuration = Math.max(0.42, currentPointsCount / 60);
                 newPoints = resamplePath([newStart, end], currentDuration);
               }
             } else if (type === "end") {
@@ -2170,7 +2157,7 @@ function App() {
               };
               if (newPoints.length) {
                 const currentPointsCount = stroke.length;
-                const currentDuration = Math.max(0.4, currentPointsCount / 60);
+                const currentDuration = Math.max(0.42, currentPointsCount / 60);
                 newPoints = resamplePath([start, newEnd], currentDuration);
               }
             }
@@ -2863,7 +2850,7 @@ function App() {
           waitDuration={
             selectedCommand?.waitDuration !== undefined
               ? selectedCommand.waitDuration
-              : 0.2
+              : 0.1
           }
           onWaitDurationChange={handleWaitDurationChange}
           selectedStrokeWait={currentStrokeWait}
