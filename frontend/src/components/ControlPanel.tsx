@@ -721,123 +721,130 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               </div>
 
               <div className="space-y-4">
-                {/* Position Info (Read Only) */}
-                <div className="grid grid-cols-2 gap-2 bg-gray-50 p-2 rounded border border-gray-200">
-                  <div>
-                    <span className="text-[10px] text-gray-400 block uppercase">
-                      開始 X
-                    </span>
-                    <span className="font-mono text-gray-700 text-sm">
-                      {absoluteX !== undefined ? formatCoord(absoluteX) : "--"}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-gray-400 block uppercase">
-                      開始 Y
-                    </span>
-                    <span className="font-mono text-gray-700 text-sm">
-                      {absoluteY !== undefined ? formatCoord(absoluteY) : "--"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Nudge Controls */}
-                <div className="flex flex-col items-center space-y-2">
-                  <span className="text-[10px] text-gray-500">
-                    位置の微調整
-                  </span>
-                  <div className="grid grid-cols-3 gap-1">
-                    <div />
-                    <button
-                      onPointerDown={() => startNudgePress(0, -1)}
-                      onPointerUp={stopNudgePress}
-                      onPointerLeave={stopNudgePress}
-                      onContextMenu={(e) => e.preventDefault()}
-                      className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 active:bg-gray-100 touch-none select-none"
-                    >
-                      <svg
-                        className="w-3 h-3"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M5 15l7-7 7 7"
-                        />
-                      </svg>
-                    </button>
-                    <div />
-                    <button
-                      onPointerDown={() => startNudgePress(-1, 0)}
-                      onPointerUp={stopNudgePress}
-                      onPointerLeave={stopNudgePress}
-                      onContextMenu={(e) => e.preventDefault()}
-                      className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 active:bg-gray-100 touch-none select-none"
-                    >
-                      <svg
-                        className="w-3 h-3"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15 19l-7-7 7-7"
-                        />
-                      </svg>
-                    </button>
-                    <div className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded-full text-[10px] text-gray-500">
-                      1px
+                {/* Position and Nudge Controls */}
+                <div className="flex bg-gray-50 p-2 rounded border border-gray-200">
+                  {/* Left: Position Info */}
+                  <div className="flex flex-col justify-center space-y-3 pr-3 border-r border-gray-200 mr-3 min-w-[70px]">
+                    <div>
+                      <span className="text-[10px] text-gray-400 block uppercase">
+                        開始 X
+                      </span>
+                      <span className="font-mono text-gray-700 text-sm">
+                        {absoluteX !== undefined
+                          ? formatCoord(absoluteX)
+                          : "--"}
+                      </span>
                     </div>
-                    <button
-                      onPointerDown={() => startNudgePress(1, 0)}
-                      onPointerUp={stopNudgePress}
-                      onPointerLeave={stopNudgePress}
-                      onContextMenu={(e) => e.preventDefault()}
-                      className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 active:bg-gray-100 touch-none select-none"
-                    >
-                      <svg
-                        className="w-3 h-3"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
+                    <div>
+                      <span className="text-[10px] text-gray-400 block uppercase">
+                        開始 Y
+                      </span>
+                      <span className="font-mono text-gray-700 text-sm">
+                        {absoluteY !== undefined
+                          ? formatCoord(absoluteY)
+                          : "--"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Right: Nudge Controls */}
+                  <div className="flex-1 flex flex-col items-center justify-center">
+                    <span className="text-[10px] text-gray-500 mb-1">
+                      位置の微調整
+                    </span>
+                    <div className="grid grid-cols-3 gap-1">
+                      <div />
+                      <button
+                        onPointerDown={() => startNudgePress(0, -1)}
+                        onPointerUp={stopNudgePress}
+                        onPointerLeave={stopNudgePress}
+                        onContextMenu={(e) => e.preventDefault()}
+                        className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 active:bg-gray-100 touch-none select-none"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 5l7 7-7 7"
-                        />
-                      </svg>
-                    </button>
-                    <div />
-                    <button
-                      onPointerDown={() => startNudgePress(0, 1)}
-                      onPointerUp={stopNudgePress}
-                      onPointerLeave={stopNudgePress}
-                      onContextMenu={(e) => e.preventDefault()}
-                      className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 active:bg-gray-100 touch-none select-none"
-                    >
-                      <svg
-                        className="w-3 h-3"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
+                        <svg
+                          className="w-3 h-3"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 15l7-7 7 7"
+                          />
+                        </svg>
+                      </button>
+                      <div />
+                      <button
+                        onPointerDown={() => startNudgePress(-1, 0)}
+                        onPointerUp={stopNudgePress}
+                        onPointerLeave={stopNudgePress}
+                        onContextMenu={(e) => e.preventDefault()}
+                        className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 active:bg-gray-100 touch-none select-none"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 9l-7-7 7-7"
-                        />
-                      </svg>
-                    </button>
-                    <div />
+                        <svg
+                          className="w-3 h-3"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 19l-7-7 7-7"
+                          />
+                        </svg>
+                      </button>
+                      <div className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded-full text-[10px] text-gray-500">
+                        1px
+                      </div>
+                      <button
+                        onPointerDown={() => startNudgePress(1, 0)}
+                        onPointerUp={stopNudgePress}
+                        onPointerLeave={stopNudgePress}
+                        onContextMenu={(e) => e.preventDefault()}
+                        className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 active:bg-gray-100 touch-none select-none"
+                      >
+                        <svg
+                          className="w-3 h-3"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 5l7 7-7 7"
+                          />
+                        </svg>
+                      </button>
+                      <div />
+                      <button
+                        onPointerDown={() => startNudgePress(0, 1)}
+                        onPointerUp={stopNudgePress}
+                        onPointerLeave={stopNudgePress}
+                        onContextMenu={(e) => e.preventDefault()}
+                        className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 active:bg-gray-100 touch-none select-none"
+                      >
+                        <svg
+                          className="w-3 h-3"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7-7 7-7"
+                          />
+                        </svg>
+                      </button>
+                      <div />
+                    </div>
                   </div>
                 </div>
 
@@ -1107,6 +1114,14 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                       />
                       <span className="text-xs text-gray-500">px</span>
                     </div>
+                  </div>
+                  <div className="flex space-x-2 mb-2">
+                    <button
+                      onClick={() => onLengthChange(150)}
+                      className="flex-1 py-1 px-2 border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 rounded text-[10px] font-medium transition-colors"
+                    >
+                      150px に揃える
+                    </button>
                   </div>
                   <input
                     type="range"
