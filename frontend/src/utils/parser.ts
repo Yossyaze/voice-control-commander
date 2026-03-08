@@ -742,22 +742,15 @@ export function createGestureData(
       if (waits && strokeIndex - 1 < waits.length) {
         waitTime = waits[strokeIndex - 1];
       }
+      // ウェイトを置く前に、前のストロークの「Touch Up」は既に追加されているはず。
+      // ここではウェイト時間を加算する。
       currentTime += waitTime;
-
-      // リフトイベント（空の Fingers/Forces）
-      const emptyDictUid = archiver.archiveMutableDict([], []);
-      const liftTimeUid = archiver.addObject(new BplistReal(currentTime));
-
-      const liftEventUid = archiver.archiveDict(
-        [fingersKeyUid, forcesKeyUid, timeKeyUid],
-        [emptyDictUid, emptyDictUid, liftTimeUid],
-      );
-      eventUids.push(liftEventUid);
-      currentTime += 0.1;
       touchId += 1;
     }
 
-    for (const p of stroke) {
+    // ストローク内の各ポイントを記録
+    for (let pointIndex = 0; pointIndex < stroke.length; pointIndex++) {
+      const p = stroke[pointIndex];
       const pStr = `{${p.x.toFixed(6)}, ${p.y.toFixed(6)}}`;
       const pointUid = archiver.archiveNSValuePoint(pStr);
       const touchIdUid = archiver.addObject(touchId);
@@ -778,14 +771,30 @@ export function createGestureData(
       // タイムスタンプ
       const eventTimeUid = archiver.addObject(new BplistReal(currentTime));
 
-      // イベント辞書（Python版と同じ: archiveDict を使用）
+      // イベント辞書
       const eventUid = archiver.archiveDict(
         [fingersKeyUid, forcesKeyUid, timeKeyUid],
         [fingersDictUid, forcesDictUid, eventTimeUid],
       );
       eventUids.push(eventUid);
+
+      // 次のポイントへ
       currentTime += frameDuration;
     }
+
+    // --- ストローク終了時の「Touch Up」イベントを追加 ---
+    // これにより、ゲーム側が「指が離れた瞬間の座標」を正確に認識できる。
+    const emptyDictUid = archiver.archiveMutableDict([], []);
+    // 最後のポイントの時刻から極小時間（0.001s）経過後、または同時刻
+    const liftTimeUid = archiver.addObject(new BplistReal(currentTime));
+    const liftEventUid = archiver.archiveDict(
+      [fingersKeyUid, forcesKeyUid, timeKeyUid],
+      [emptyDictUid, emptyDictUid, liftTimeUid],
+    );
+    eventUids.push(liftEventUid);
+
+    // 次のストロークのために少し時間を空ける
+    currentTime += 0.05;
   }
 
   // AllEvents 配列

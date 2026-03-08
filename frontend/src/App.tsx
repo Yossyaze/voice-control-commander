@@ -1057,7 +1057,9 @@ function App() {
   // Helper for path resampling
   const resamplePath = (points: Point[], dur: number): Point[] => {
     if (points.length === 0) return [];
-    const targetCount = Math.max(2, Math.round(dur * 60));
+    // targetCount = (所要時間 * 60フレーム) + 1 (始点分)
+    // これにより、最後の点がちょうど dur 秒の地点になる。
+    const targetCount = Math.max(2, Math.round(dur * 60) + 1);
     if (points.length === 1) return Array(targetCount).fill(points[0]);
     if (points.length === 2) {
       const start = points[0];
@@ -1087,6 +1089,7 @@ function App() {
     const step = totalLength / (targetCount - 1);
     let currentDist = 0;
     let currentSegmentIndex = 0;
+
     for (let i = 1; i < targetCount - 1; i++) {
       const targetDist = i * step;
       while (
@@ -1110,6 +1113,7 @@ function App() {
         y: segmentStart.y + (segmentEnd.y - segmentStart.y) * t,
       });
     }
+    // 最後に必ず終点を追加
     newPoints.push(points[points.length - 1]);
     return newPoints;
   };
