@@ -963,7 +963,7 @@ function App() {
         }
         timeline.push({
           type: "stroke",
-          duration: Math.max(0.1, s.length / 60),
+          duration: Math.max(0.1, (s.length - 1) / 60),
           strokeIndex: i,
         });
       });
@@ -1525,7 +1525,7 @@ function App() {
         // Specific stroke
         const s = selectedCommand.strokes[selectedStrokeIndex];
         // Allow shorter durations like 0.1s. Min 0.1s for safety.
-        return Math.max(0.05, Math.round((s.length / 60) * 100) / 100);
+        return Math.max(0.05, Math.round(((s.length - 1) / 60) * 100) / 100);
       } else {
         // Total sequential time: Sum(strokes) + Sum(gaps)
         const waitTime =
@@ -1535,7 +1535,7 @@ function App() {
         let total = 0;
         selectedCommand.strokes.forEach((s, i) => {
           if (i > 0) total += waitTime;
-          total += Math.max(0.1, s.length / 60);
+          total += Math.max(0.1, (s.length - 1) / 60);
         });
         return Math.round(total * 100) / 100;
       }
@@ -2150,7 +2150,10 @@ function App() {
 
               if (newPoints.length) {
                 const currentPointsCount = stroke.length;
-                const currentDuration = Math.max(0.42, currentPointsCount / 60);
+                const currentDuration = Math.max(
+                  0.42,
+                  (currentPointsCount - 1) / 60,
+                );
                 newPoints = resamplePath([newStart, end], currentDuration);
               }
             } else if (type === "end") {
@@ -2161,7 +2164,10 @@ function App() {
               };
               if (newPoints.length) {
                 const currentPointsCount = stroke.length;
-                const currentDuration = Math.max(0.42, currentPointsCount / 60);
+                const currentDuration = Math.max(
+                  0.42,
+                  (currentPointsCount - 1) / 60,
+                );
                 newPoints = resamplePath([start, newEnd], currentDuration);
               }
             }
