@@ -893,18 +893,26 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                     </div>
                   </div>
                   {/* --- 新規追加: 時間プリセット --- */}
-                  <div className="flex space-x-2 mb-2">
+                  <div className="flex space-x-1 mb-2">
                     <button
                       onClick={() => onDurationChange(0.2)}
-                      className="flex-1 py-1 px-2 border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded text-[10px] font-medium transition-colors"
+                      className="flex-1 py-1 px-1 border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded text-[9px] font-medium transition-colors"
+                      title="ゲージなし"
                     >
-                      0.2秒 (ゲージなし)
+                      0.2s
+                    </button>
+                    <button
+                      onClick={() => onDurationChange(0.4)}
+                      className="flex-1 py-1 px-1 border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded text-[9px] font-medium transition-colors"
+                    >
+                      0.40s
                     </button>
                     <button
                       onClick={() => onDurationChange(0.42)}
-                      className="flex-1 py-1 px-2 border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded text-[10px] font-medium transition-colors"
+                      className="flex-1 py-1 px-1 border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded text-[9px] font-medium transition-colors"
+                      title="ゲージ最大"
                     >
-                      0.42秒 (ゲージあり)
+                      0.42s
                     </button>
                   </div>
                   {/* ---------------------------------- */}
