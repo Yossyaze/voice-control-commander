@@ -1125,10 +1125,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   </div>
                   <div className="flex space-x-2 mb-2">
                     <button
-                      onClick={() => onLengthChange(150)}
+                      onClick={() => onLengthChange(170)}
                       className="flex-1 py-1 px-2 border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 rounded text-[10px] font-medium transition-colors"
                     >
-                      150px に揃える
+                      170px に揃える
                     </button>
                   </div>
                   <input
