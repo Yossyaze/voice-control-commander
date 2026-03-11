@@ -783,18 +783,18 @@ export function createGestureData(
     }
 
     // --- ストローク終了時の「Touch Up」イベントを追加 ---
-    // これにより、ゲーム側が「指が離れた瞬間の座標」を正確に認識できる。
+    // 最後のポイントと同じ時刻（1フレーム巻き戻し）にリフトを配置。
+    // currentTime はループ内で最後に +frameDuration されているため、
+    // 実際の最終ポイントの時刻は currentTime - frameDuration。
+    const liftTime = currentTime - frameDuration;
     const emptyDictUid = archiver.archiveMutableDict([], []);
-    // 最後のポイントの時刻から極小時間（0.001s）経過後、または同時刻
-    const liftTimeUid = archiver.addObject(new BplistReal(currentTime));
+    const liftTimeUid = archiver.addObject(new BplistReal(liftTime));
     const liftEventUid = archiver.archiveDict(
       [fingersKeyUid, forcesKeyUid, timeKeyUid],
       [emptyDictUid, emptyDictUid, liftTimeUid],
     );
     eventUids.push(liftEventUid);
-
-    // 次のストロークのために少し時間を空ける
-    currentTime += 0.05;
+    // 余分な空白時間は入れない。次のストロークのウェイトはユーザー設定値のみで管理する。
   }
 
   // AllEvents 配列
