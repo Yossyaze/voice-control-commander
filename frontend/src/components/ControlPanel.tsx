@@ -907,13 +907,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                     >
                       0.40s
                     </button>
-                    <button
-                      onClick={() => onDurationChange(0.42)}
-                      className="flex-1 py-1 px-1 border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded text-[9px] font-medium transition-colors"
-                      title="ゲージ最大"
-                    >
-                      0.42s
-                    </button>
                   </div>
                   {/* ---------------------------------- */}
                   <input

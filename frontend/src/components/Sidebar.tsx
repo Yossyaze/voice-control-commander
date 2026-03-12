@@ -261,7 +261,11 @@ const SortableCommandItem = React.memo(
 
     // Stroke Reordering Logic
     const strokeSensors = useSensors(
-      useSensor(PointerSensor),
+      useSensor(PointerSensor, {
+        activationConstraint: {
+          distance: 5,
+        },
+      }),
       useSensor(KeyboardSensor, {
         coordinateGetter: sortableKeyboardCoordinates,
       }),
@@ -716,7 +720,11 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
   };
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     }),

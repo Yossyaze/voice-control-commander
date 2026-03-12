@@ -1122,7 +1122,7 @@ function App() {
   const handleCreateNewCommand = () => {
     saveToHistory();
     const newId = crypto.randomUUID();
-    const initialPoints = resamplePath(DEFAULT_COMMAND_POINTS, 0.42);
+    const initialPoints = resamplePath(DEFAULT_COMMAND_POINTS, 0.4);
 
     // Create new command with one stroke
     const newCommand: Command = {
@@ -1131,7 +1131,7 @@ function App() {
       points: initialPoints, // Legacy support, keeps sync with first stroke
       strokes: [initialPoints],
       isVisible: true,
-      duration: 0.42,
+      duration: 0.4,
       waitDuration: 0.1, // Default wait duration
       color: getNextColor(commands), // Assign color to command
     };
@@ -1150,11 +1150,35 @@ function App() {
     if (!cmdToCopy) return;
 
     saveToHistory();
+
+    // macOSスタイル (連番) の命名ロジック
+    const originalName = cmdToCopy.name;
+    let nextName = "";
+    
+    // 末尾の「 数字」パターンを抽出 (例: "コマンド 2" -> "2")
+    const match = originalName.match(/(.+)\s(\d+)$/);
+    let baseName = originalName;
+    let nextNumber = 2;
+
+    if (match) {
+      baseName = match[1];
+      nextNumber = parseInt(match[2], 10) + 1;
+    }
+
+    // 重複しない名前が見つかるまでインクリメント
+    while (true) {
+      nextName = `${baseName} ${nextNumber}`;
+      if (!commands.some((c) => c.name === nextName)) {
+        break;
+      }
+      nextNumber++;
+    }
+
     const newId = crypto.randomUUID();
     const duplicatedCommand: Command = {
       ...JSON.parse(JSON.stringify(cmdToCopy)), // deep copy
       id: newId,
-      name: `${cmdToCopy.name} (コピー)`,
+      name: nextName,
       color: getNextColor(commands),
     };
 
@@ -2151,7 +2175,7 @@ function App() {
               if (newPoints.length) {
                 const currentPointsCount = stroke.length;
                 const currentDuration = Math.max(
-                  0.42,
+                  0.40,
                   (currentPointsCount - 1) / 60,
                 );
                 newPoints = resamplePath([newStart, end], currentDuration);
@@ -2165,7 +2189,7 @@ function App() {
               if (newPoints.length) {
                 const currentPointsCount = stroke.length;
                 const currentDuration = Math.max(
-                  0.42,
+                  0.40,
                   (currentPointsCount - 1) / 60,
                 );
                 newPoints = resamplePath([start, newEnd], currentDuration);
