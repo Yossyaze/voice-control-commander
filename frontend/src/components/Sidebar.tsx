@@ -198,6 +198,7 @@ const InlineEditInput: React.FC<InlineEditInputProps> = ({
   onCommit,
 }) => {
   const [localValue, setLocalValue] = React.useState(initialValue);
+  const isComposingRef = React.useRef(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
@@ -217,8 +218,26 @@ const InlineEditInput: React.FC<InlineEditInputProps> = ({
       value={localValue}
       onChange={(e) => setLocalValue(e.target.value)}
       onBlur={handleCommit}
+      onCompositionStart={() => {
+        isComposingRef.current = true;
+      }}
+      onCompositionEnd={() => {
+        // コンポジション終了のタイミングと onKeyDown(Enter) のタイミングが同じになることがあるため
+        // 少し遅らせてフラグを解除する
+        setTimeout(() => {
+          isComposingRef.current = false;
+        }, 100);
+      }}
       onKeyDown={(e) => {
-        if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+        if (e.key === "Enter") {
+          // IME変換中のEnter（確定）かどうかを徹底的に判定する
+          if (
+            isComposingRef.current ||
+            e.nativeEvent.isComposing ||
+            e.keyCode === 229
+          ) {
+            return;
+          }
           handleCommit();
         }
       }}
