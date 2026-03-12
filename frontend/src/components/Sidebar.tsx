@@ -186,16 +186,57 @@ const SortableStrokeItem = React.memo(
 );
 
 // ----------------------------------------------------------------------------
+// Inline Edit Input Component
+// ----------------------------------------------------------------------------
+interface InlineEditInputProps {
+  initialValue: string;
+  onCommit: (newValue: string) => void;
+}
+
+const InlineEditInput: React.FC<InlineEditInputProps> = ({
+  initialValue,
+  onCommit,
+}) => {
+  const [localValue, setLocalValue] = React.useState(initialValue);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.select();
+    }
+  }, []);
+
+  const handleCommit = () => {
+    onCommit(localValue);
+  };
+
+  return (
+    <input
+      ref={inputRef}
+      type="text"
+      value={localValue}
+      onChange={(e) => setLocalValue(e.target.value)}
+      onBlur={handleCommit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+          handleCommit();
+        }
+      }}
+      className="text-sm font-bold w-full border border-blue-500 rounded px-1.5 py-0.5 -ml-1.5 focus:outline-none focus:ring-2 focus:ring-blue-200"
+      onClick={(e) => e.stopPropagation()}
+    />
+  );
+};
+
+// ----------------------------------------------------------------------------
 // Sortable Command Item
 // ----------------------------------------------------------------------------
 interface SortableCommandItemProps {
   command: Command;
   isSelected: boolean;
   editingId: string | null;
-  editingName: string;
-  setEditingName: (name: string) => void;
   onStartEditing: (id: string, name: string) => void;
-  onFinishEditing: () => void;
+  onFinishEditing: (id: string, newName: string) => void;
   onSelect: () => void;
   onToggleVisibility: () => void;
   onDelete: () => void;
@@ -219,8 +260,6 @@ const SortableCommandItem = React.memo(
     command,
     isSelected,
     editingId,
-    editingName,
-    setEditingName,
     onStartEditing,
     onFinishEditing,
     onSelect,
@@ -251,13 +290,6 @@ const SortableCommandItem = React.memo(
       zIndex: isDragging ? 999 : "auto",
       opacity: isDragging ? 0.7 : 1,
     };
-
-    const inputRef = React.useRef<HTMLInputElement>(null);
-    React.useEffect(() => {
-      if (editingId === command.id && inputRef.current) {
-        inputRef.current.select();
-      }
-    }, [editingId, command.id]);
 
     // Stroke Reordering Logic
     const strokeSensors = useSensors(
@@ -358,19 +390,9 @@ const SortableCommandItem = React.memo(
 
             {/* Name */}
             {editingId === command.id ? (
-              <input
-                ref={inputRef}
-                type="text"
-                value={editingName}
-                onChange={(e) => setEditingName(e.target.value)}
-                onBlur={onFinishEditing}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                    onFinishEditing();
-                  }
-                }}
-                className="text-sm font-bold w-full border border-blue-500 rounded px-1.5 py-0.5 -ml-1.5 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                onClick={(e) => e.stopPropagation()}
+              <InlineEditInput
+                initialValue={command.name}
+                onCommit={(newName) => onFinishEditing(command.id, newName)}
               />
             ) : (
               <span
@@ -659,7 +681,6 @@ const SortableCommandItem = React.memo(
       prevProps.isSelected === nextProps.isSelected &&
       prevProps.isMultiSelected === nextProps.isMultiSelected &&
       prevProps.editingId === nextProps.editingId &&
-      prevProps.editingName === nextProps.editingName &&
       prevProps.selectedStrokeIndex === nextProps.selectedStrokeIndex &&
       prevProps.selectionType === nextProps.selectionType
     );
@@ -704,19 +725,16 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
   } = props;
 
   const [editingId, setEditingId] = React.useState<string | null>(null);
-  const [editingName, setEditingName] = React.useState("");
 
-  const handleStartEditing = (id: string, name: string) => {
+  const handleStartEditing = (id: string) => {
     setEditingId(id);
-    setEditingName(name);
   };
 
-  const handleFinishEditing = () => {
-    if (editingId && editingName.trim()) {
-      onRenameCommand(editingId, editingName.trim());
+  const handleFinishEditing = (id: string, newName: string) => {
+    if (newName.trim()) {
+      onRenameCommand(id, newName.trim());
     }
     setEditingId(null);
-    setEditingName("");
   };
 
   const sensors = useSensors(
@@ -1013,9 +1031,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                     command={cmd}
                     isSelected={cmd.id === activeCommandId}
                     editingId={editingId}
-                    editingName={editingName}
-                    setEditingName={setEditingName}
-                    onStartEditing={handleStartEditing}
+                    onStartEditing={() => handleStartEditing(cmd.id)}
                     onFinishEditing={handleFinishEditing}
                     onSelect={() => {
                       onSelectCommand(cmd.id);
