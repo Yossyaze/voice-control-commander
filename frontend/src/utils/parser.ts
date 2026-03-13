@@ -717,6 +717,7 @@ class NSKeyedArchiverWriter {
 export function createGestureData(
   strokes: Point[][],
   waits?: number[],
+  tapDuration: number = 0.05,
 ): Uint8Array {
   const archiver = new NSKeyedArchiverWriter();
 
@@ -782,6 +783,16 @@ export function createGestureData(
       currentTime += frameDuration;
     }
 
+    // --- タップ持続時間の適用 ---
+    // ストロークが1点のみ（タップ）の場合、指定された tapDuration 分だけ時間を進める
+    if (stroke.length === 1 && tapDuration > 0) {
+      // すでに1フレーム分(frameDuration)は進んでいるので、残りの時間を加算
+      const remainingTapWait = Math.max(0, tapDuration - frameDuration);
+      if (remainingTapWait > 0) {
+        currentTime += remainingTapWait;
+      }
+    }
+
     // --- ストローク終了時の「Touch Up」イベントを追加 ---
     // 最後のポイントと同じ時刻（1フレーム巻き戻し）にリフトを配置。
     // currentTime はループ内で最後に +frameDuration されているため、
@@ -827,6 +838,7 @@ export interface ExportCommandData {
   points?: Point[];
   strokes: Point[][];
   stroke_waits?: number[];
+  tapDuration?: number;
 }
 
 /**
@@ -937,7 +949,11 @@ export function createCombinedPlist(
       strokesToUse = [cmd.points];
     }
 
-    const gestureData = createGestureData(strokesToUse, cmd.stroke_waits || []);
+    const gestureData = createGestureData(
+      strokesToUse,
+      cmd.stroke_waits || [],
+      cmd.tapDuration ?? 0.05,
+    );
 
     commandsTable[cmdId] = {
       CommandID: cmdId,

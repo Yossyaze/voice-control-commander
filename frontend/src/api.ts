@@ -25,6 +25,7 @@ import {
  * そのため、オブジェクトから undefined を除去し、
  * 配列の中にさらに配列が含まれるもの（例: strokes: Point[][]）は JSON 文字列に変換する。
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function serializeForFirestore(obj: any): any {
   if (Array.isArray(obj)) {
     // Nested Array かどうかチェック
@@ -42,6 +43,7 @@ function serializeForFirestore(obj: any): any {
         acc[key] = serializeForFirestore(obj[key]);
       }
       return acc;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     }, {} as any);
   }
   return obj;
@@ -51,6 +53,7 @@ function serializeForFirestore(obj: any): any {
  * Firestore から取得したデータを元の形に復元するユーティリティ。
  * _isNestedArray フラグを持つオブジェクトを配列に戻す。
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function deserializeFromFirestore(obj: any): any {
   if (Array.isArray(obj)) {
     return obj.map(deserializeFromFirestore);
@@ -66,6 +69,7 @@ function deserializeFromFirestore(obj: any): any {
     return Object.keys(obj).reduce((acc, key) => {
       acc[key] = deserializeFromFirestore(obj[key]);
       return acc;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     }, {} as any);
   }
   return obj;
@@ -92,6 +96,7 @@ export interface Command {
   strokeMetadata?: { waitAfter?: number }[];
   isVisible?: boolean;
   duration?: number;
+  tapDuration?: number;
   waitDuration?: number;
   color?: string;
   showPoints?: boolean;

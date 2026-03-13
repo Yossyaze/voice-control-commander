@@ -18,7 +18,7 @@ interface ControlPanelProps {
   onSelectModel: (id: string) => void;
   orientation: "portrait" | "landscape";
   onSelectOrientation: (orientation: "portrait" | "landscape") => void;
-  onBackgroundImageUpload: (file: File) => void;
+  onBackgroundImageUpload: (files: FileList) => void;
   onBackgroundImageSelect?: (url: string) => void;
   onClearBackgroundImage: () => void;
   backgroundsList?: BackgroundImage[];
@@ -46,6 +46,7 @@ interface ControlPanelProps {
   isActionSelected?: boolean;
   waitDuration?: number;
   onWaitDurationChange?: (duration: number) => void;
+  onApplyWaitToAll?: (duration: number) => void;
   scale: number;
   onScaleChange: (scale: number) => void;
   selectedStrokeWait?: number;
@@ -54,6 +55,9 @@ interface ControlPanelProps {
   onDeleteSelectedAction?: () => void;
   onFlipAngle?: () => void;
   onFlip?: (direction: "horizontal" | "vertical") => void;
+  isTap?: boolean;
+  tapDuration?: number;
+  onTapDurationChange?: (duration: number) => void;
 
   // お気に入り環境設定
   favoriteEnvironments?: import("../api").EnvironmentSettings[];
@@ -175,6 +179,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   isActionSelected,
   waitDuration,
   onWaitDurationChange,
+  onApplyWaitToAll,
   selectedStrokeWait,
   onSelectedStrokeWaitChange,
   selectionType = "stroke",
@@ -189,6 +194,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   onDeleteEnvironment,
   exportExtension = ".voicecontrolcom",
   onExportExtensionChange,
+  isTap,
+  tapDuration,
+  onTapDurationChange,
 }) => {
   const { confirm, prompt } = useDialog();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -272,7 +280,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   return (
     <div className="w-full bg-white flex flex-col h-full font-sans z-20 overflow-hidden">
       {/* Header */}
-      <div className="h-12 px-4 border-b border-gray-200 bg-white flex justify-between items-center flex-shrink-0">
+      <div className="h-12 px-4 border-b border-gray-200 bg-white flex justify-between items-center shrink-0">
         <h2 className="text-xs font-bold text-gray-500 tracking-wider uppercase">
           プロパティ
         </h2>
@@ -300,7 +308,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         )}
       </div>
 
-      <div className="flex border-b border-gray-200 bg-gray-50 flex-shrink-0">
+      <div className="flex border-b border-gray-200 bg-gray-50 shrink-0">
         <button
           className={`flex-1 text-xs py-3 font-bold transition-colors text-center border-b-2 ${activeTab === "action" ? "border-blue-500 text-blue-600 bg-white" : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100"}`}
           onClick={() => setActiveTab("action")}
@@ -364,7 +372,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                         </span>
                       </button>
                       {/* 操作ボタン群 */}
-                      <div className="flex items-center space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-1">
+                      <div className="flex items-center space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-1">
                         {/* 上書き保存 */}
                         <button
                           onClick={async () => {
@@ -629,9 +637,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   ref={fileInputRef}
                   className="hidden"
                   accept="image/*"
+                  multiple
                   onChange={(e) => {
-                    if (e.target.files?.[0]) {
-                      onBackgroundImageUpload(e.target.files[0]);
+                    if (e.target.files && e.target.files.length > 0) {
+                      onBackgroundImageUpload(e.target.files);
                       e.target.value = "";
                     }
                   }}
@@ -877,46 +886,67 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 <div>
                   <div className="flex justify-between mb-1 items-center">
                     <label className="text-xs font-medium text-gray-600">
-                      所要時間
+                      {isTap ? "タップの持続時間" : "所要時間"}
                     </label>
                     <div className="flex items-center space-x-1">
                       <BufferedNumberInput
-                        minVal={0.1}
+                        minVal={0.01}
                         maxVal={5.0}
-                        step="0.05"
-                        value={duration}
-                        onChange={onDurationChange}
+                        step="0.01"
+                        value={isTap ? (tapDuration ?? 0.05) : duration}
+                        onChange={isTap ? (onTapDurationChange ?? onDurationChange) : onDurationChange}
                         format={(v) => Number(v).toFixed(2)}
                         className="w-16 text-xs font-mono bg-gray-100 px-1 py-0.5 rounded border border-transparent focus:border-blue-500 focus:bg-white text-right outline-none transition-colors"
                       />
                       <span className="text-xs text-gray-500">秒</span>
                     </div>
                   </div>
-                  {/* --- 新規追加: 時間プリセット --- */}
+                  {/* --- 時間プリセット --- */}
                   <div className="flex space-x-1 mb-2">
-                    <button
-                      onClick={() => onDurationChange(0.2)}
-                      className="flex-1 py-1 px-1 border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded text-[9px] font-medium transition-colors"
-                      title="ゲージなし"
-                    >
-                      0.2s
-                    </button>
-                    <button
-                      onClick={() => onDurationChange(0.4)}
-                      className="flex-1 py-1 px-1 border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded text-[9px] font-medium transition-colors"
-                    >
-                      0.40s
-                    </button>
+                    {isTap ? (
+                      <>
+                        <button
+                          onClick={() => onTapDurationChange?.(0.05)}
+                          className="flex-1 py-1 px-1 border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded text-[9px] font-medium transition-colors"
+                        >
+                          0.05s
+                        </button>
+                        <button
+                          onClick={() => onTapDurationChange?.(0.1)}
+                          className="flex-1 py-1 px-1 border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded text-[9px] font-medium transition-colors"
+                        >
+                          0.10s
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => onDurationChange(0.2)}
+                          className="flex-1 py-1 px-1 border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded text-[9px] font-medium transition-colors"
+                          title="ゲージなし"
+                        >
+                          0.2s
+                        </button>
+                        <button
+                          onClick={() => onDurationChange(0.4)}
+                          className="flex-1 py-1 px-1 border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded text-[9px] font-medium transition-colors"
+                        >
+                          0.40s
+                        </button>
+                      </>
+                    )}
                   </div>
                   {/* ---------------------------------- */}
                   <input
                     type="range"
-                    min="0.1"
-                    max="5.0"
-                    step="0.05"
-                    value={duration}
+                    min="0.01"
+                    max={isTap ? "1.0" : "5.0"}
+                    step="0.01"
+                    value={isTap ? (tapDuration ?? 0.05) : duration}
                     onChange={(e) =>
-                      onDurationChange(parseFloat(e.target.value))
+                      isTap
+                        ? onTapDurationChange?.(parseFloat(e.target.value))
+                        : onDurationChange(parseFloat(e.target.value))
                     }
                     className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                   />
@@ -1215,8 +1245,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 </label>
                 <div className="flex items-center space-x-2">
                   <BufferedNumberInput
-                    minVal={0.1}
-                    step="0.05"
+                    minVal={0.0}
+                    step="0.01"
                     value={selectedStrokeWait ?? waitDuration ?? 0.1}
                     onChange={(val) => {
                       if (selectionType === "wait") {
@@ -1225,14 +1255,45 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                         onWaitDurationChange?.(val);
                       }
                     }}
-                    format={(v) => Number(v).toString()}
+                    format={(v) => Number(v).toFixed(2)}
                     className="w-full text-sm border-blue-200 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   />
                   <span className="text-xs text-blue-700 font-medium whitespace-nowrap">
                     秒
                   </span>
                 </div>
+                {/* 待機時間スライダーを追加 */}
+                <div className="mt-4">
+                  <input
+                    type="range"
+                    min="0.00"
+                    max="5.00"
+                    step="0.05"
+                    value={selectedStrokeWait ?? waitDuration ?? 0.1}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      if (selectionType === "wait") onSelectedStrokeWaitChange?.(val);
+                      else onWaitDurationChange?.(val);
+                    }}
+                    className="w-full h-1.5 bg-blue-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                  />
+                  <div className="flex justify-between mt-1">
+                    <span className="text-[9px] text-blue-400 font-mono">0.0s</span>
+                    <span className="text-[9px] text-blue-400 font-mono">5.0s</span>
+                  </div>
+                </div>
                 <div className="flex justify-end space-x-1 mt-2">
+                  <button
+                    onClick={() => {
+                      const val = 0.05;
+                      if (selectionType === "wait")
+                        onSelectedStrokeWaitChange?.(val);
+                      else onWaitDurationChange?.(val);
+                    }}
+                    className="px-2 py-1 text-[10px] bg-white hover:bg-blue-100 rounded text-blue-600 border border-blue-200"
+                  >
+                    0.05秒
+                  </button>
                   <button
                     onClick={() => {
                       const val = 0.1;
@@ -1245,6 +1306,22 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                     デフォルト (0.1秒)
                   </button>
                 </div>
+
+                <div className="mt-4 pt-4 border-t border-blue-100">
+                  <button
+                    onClick={() => {
+                      const currentVal = selectedStrokeWait ?? waitDuration ?? 0.1;
+                      onApplyWaitToAll?.(currentVal);
+                    }}
+                    className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md text-xs font-bold hover:bg-blue-700 transition shadow-sm"
+                    title="このコマンド内のすべての待機時間を現在の値に揃えます"
+                  >
+                    🚀 このコマンド内すべてに適用
+                  </button>
+                  <p className="text-[10px] text-blue-500 mt-2 text-center leading-relaxed">
+                    ※ コマンド内の全アクションの個別に設定された待機時間を上書きし、現在の値（{Number(selectedStrokeWait ?? waitDuration ?? 0.1).toFixed(2)}s）に統一します。
+                  </p>
+                </div>
               </div>
             </div>
           )}
@@ -1253,7 +1330,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       </div>
 
       {/* Bottom Static Section: Playback & Export */}
-      <div className="p-3 border-t border-gray-200 bg-gray-50 flex-shrink-0 space-y-2">
+      <div className="p-3 border-t border-gray-200 bg-gray-50 shrink-0 space-y-2">
         <button
           onClick={onTogglePlay}
           className={`w-full flex items-center justify-center px-3 py-2 border border-transparent rounded shadow-sm text-xs font-medium text-white transition-colors ${

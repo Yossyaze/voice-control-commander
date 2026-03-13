@@ -715,19 +715,18 @@ function App() {
   const [pastLevels, setPastLevels] = useState<Command[][]>([]);
   const [futureLevels, setFutureLevels] = useState<Command[][]>([]);
 
-  const saveToHistory = useCallback(
-    (currentCommands?: Command[]) => {
-      const stateToSave = currentCommands || commands;
-      setPastLevels((prev) => [
-        ...prev,
-        JSON.parse(JSON.stringify(stateToSave)),
-      ]);
-      setFutureLevels([]);
-    },
-    [commands],
-  );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const saveToHistory = (currentCommands?: Command[]) => {
+    const stateToSave = currentCommands || commands;
+    setPastLevels((prev) => [
+      ...prev,
+      JSON.parse(JSON.stringify(stateToSave)),
+    ]);
+    setFutureLevels([]);
+  };
 
-  const handleUndo = useCallback(() => {
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const handleUndo = () => {
     if (pastLevels.length === 0) return;
     const previousState = pastLevels[pastLevels.length - 1];
     setPastLevels((prev) => prev.slice(0, -1));
@@ -740,15 +739,16 @@ function App() {
       setActiveCommandId(previousState.length > 0 ? previousState[0].id : null);
       setSelectedStrokeIndex(null);
     }
-  }, [pastLevels, commands, activeCommandId]);
+  };
 
-  const handleRedo = useCallback(() => {
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const handleRedo = () => {
     if (futureLevels.length === 0) return;
     const nextState = futureLevels[0];
     setFutureLevels((prev) => prev.slice(1));
     setPastLevels((prev) => [...prev, JSON.parse(JSON.stringify(commands))]);
     setCommands(nextState);
-  }, [futureLevels, commands]);
+  };
 
   // --- 永続化される表示設定 ---
   const [selectedModelId, setSelectedModelId] = useState<string>(() =>
@@ -1030,7 +1030,7 @@ function App() {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
-      setMarkerPosition(null);
+      setTimeout(() => setMarkerPosition(null), 0);
       startTimeRef.current = null;
     }
 
@@ -1132,6 +1132,7 @@ function App() {
       strokes: [initialPoints],
       isVisible: true,
       duration: 0.4,
+      tapDuration: 0.05,
       waitDuration: 0.1, // Default wait duration
       color: getNextColor(commands), // Assign color to command
     };
@@ -1300,8 +1301,8 @@ function App() {
     const diffRaw = newAngleRaw - currentAngleRaw;
     const diffRad = (diffRaw / 1024) * 2 * Math.PI;
 
-    const start = points[0];
-    const pivot = { x: start.x, y: start.y };
+    const end = points[points.length - 1];
+    const pivot = { x: end.x, y: end.y };
 
     const cos = Math.cos(diffRad);
     const sin = Math.sin(diffRad);
@@ -1567,7 +1568,7 @@ function App() {
     return 0;
   }, [selectedCommand, selectedStrokeIndex]);
 
-  const handleDeleteSelectedAction = useCallback(() => {
+  const handleDeleteSelectedAction = () => {
     if (!activeCommandId || selectedStrokeIndex === null) return;
 
     saveToHistory();
@@ -1592,7 +1593,7 @@ function App() {
       // Let's stick to null (command selection) to be safe or index 0 if exists?
       // Let's just go null for now.
     }
-  }, [activeCommandId, selectedStrokeIndex, saveToHistory]);
+  };
 
   // ==== 角度反転ハンドラー ====
   const handleFlipAngle = () => {
@@ -1604,24 +1605,29 @@ function App() {
       return;
 
     const stroke = selectedCommand.strokes[selectedStrokeIndex];
-    if (stroke.length < 2) return;
+    if (stroke.length < 1) return;
 
-    const p0 = stroke[0];
-    const pEnd = stroke[stroke.length - 1];
+    // 軌跡を囲む枠（バウンディングボックス）の中心を計算
+    let minX = Infinity,
+      maxX = -Infinity,
+      minY = Infinity,
+      maxY = -Infinity;
+    for (const p of stroke) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
 
-    const dx = pEnd.x - p0.x;
-    const dy = pEnd.y - p0.y;
+    // 中心点に対する点対称移動（180度回転）
+    const newPoints = stroke.map((p) => ({
+      x: 2 * centerX - p.x,
+      y: 2 * centerY - p.y,
+    }));
 
-    let rad = Math.atan2(dy, dx);
-    if (rad < 0) rad += 2 * Math.PI;
-
-    // Convert to 0-1024
-    const currentAngle = (rad / (2 * Math.PI)) * 1024;
-
-    // Flip angle (+512 modulo 1024)
-    const newAngle = (currentAngle + 512) % 1024;
-
-    handleAngleChange(newAngle);
+    updateSelectedStroke(newPoints);
   };
 
   // ============================================================================
@@ -1841,6 +1847,7 @@ function App() {
           points: [] as Point[],
           strokes: cmd.strokes,
           stroke_waits: strokeWaits,
+          tapDuration: cmd.tapDuration,
         };
       })
       .filter((c) => c !== null);
@@ -1939,84 +1946,82 @@ function App() {
   const handleClearCommandSelection = () => {
     setCheckedCommandIds(new Set());
   };
-  const handleScaleChange = useCallback(
-    (
-      newScaleOrUpdater: number | ((prev: number) => number),
-      cursorX?: number,
-      cursorY?: number,
-    ) => {
-      setScale((prevScale) => {
-        let newScale: number;
-        if (typeof newScaleOrUpdater === "function") {
-          newScale = newScaleOrUpdater(prevScale);
-        } else {
-          newScale = newScaleOrUpdater;
-        }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const handleScaleChange = (
+    newScaleOrUpdater: number | ((prev: number) => number),
+    cursorX?: number,
+    cursorY?: number,
+  ) => {
+    setScale((prevScale) => {
+      let newScale: number;
+      if (typeof newScaleOrUpdater === "function") {
+        newScale = newScaleOrUpdater(prevScale);
+      } else {
+        newScale = newScaleOrUpdater;
+      }
 
-        newScale = Math.min(Math.max(newScale, 0.2), 10.0);
+      newScale = Math.min(Math.max(newScale, 0.2), 10.0);
 
-        if (newScale !== prevScale && scrollContainerRef.current) {
-          const container = scrollContainerRef.current;
-          const canvasEl = container.querySelector("canvas");
-          if (canvasEl) {
-            const containerRect = container.getBoundingClientRect();
-            const canvasRect = canvasEl.getBoundingClientRect();
+      if (newScale !== prevScale && scrollContainerRef.current) {
+        const container = scrollContainerRef.current;
+        const canvasEl = container.querySelector("canvas");
+        if (canvasEl) {
+          const containerRect = container.getBoundingClientRect();
+          const canvasRect = canvasEl.getBoundingClientRect();
 
-            // ビューポート内の基準点（スクリーン座標）
-            let screenX = cursorX;
-            let screenY = cursorY;
-            if (screenX === undefined || screenY === undefined) {
-              screenX = containerRect.left + containerRect.width / 2;
-              screenY = containerRect.top + containerRect.height / 2;
-            }
-
-            // ビューポート内の基準点の位置（コンテナ相対）
-            const viewportX = screenX - containerRect.left;
-            const viewportY = screenY - containerRect.top;
-
-            // 基準点のキャンバス左端からの距離（CSSピクセル、旧スケール時）
-            const canvasContentLeft =
-              canvasRect.left - containerRect.left + container.scrollLeft;
-            const canvasContentTop =
-              canvasRect.top - containerRect.top + container.scrollTop;
-            const dxFromCanvas =
-              container.scrollLeft + viewportX - canvasContentLeft;
-            const dyFromCanvas =
-              container.scrollTop + viewportY - canvasContentTop;
-
-            const scaleRatio = newScale / prevScale;
-
-            // rAF内でReactのレンダリング後の実際のキャンバス位置を使って補正
-            window.requestAnimationFrame(() => {
-              if (!scrollContainerRef.current) return;
-              const c = scrollContainerRef.current;
-              const newCanvasRect = canvasEl.getBoundingClientRect();
-              const newContainerRect = c.getBoundingClientRect();
-
-              // レンダリング後のキャンバスのコンテンツ内位置
-              const newCanvasContentLeft =
-                newCanvasRect.left - newContainerRect.left + c.scrollLeft;
-              const newCanvasContentTop =
-                newCanvasRect.top - newContainerRect.top + c.scrollTop;
-
-              // 基準点のコンテンツ内新位置
-              const targetContentX =
-                newCanvasContentLeft + dxFromCanvas * scaleRatio;
-              const targetContentY =
-                newCanvasContentTop + dyFromCanvas * scaleRatio;
-
-              // 基準点がビューポート上の同じ位置に来るようスクロール
-              c.scrollLeft = targetContentX - viewportX;
-              c.scrollTop = targetContentY - viewportY;
-            });
+          // ビューポート内の基準点（スクリーン座標）
+          let screenX = cursorX;
+          let screenY = cursorY;
+          if (screenX === undefined || screenY === undefined) {
+            screenX = containerRect.left + containerRect.width / 2;
+            screenY = containerRect.top + containerRect.height / 2;
           }
-        }
 
-        return newScale;
-      });
-    },
-    [],
-  );
+          // ビューポート内の基準点の位置（コンテナ相対）
+          const viewportX = screenX - containerRect.left;
+          const viewportY = screenY - containerRect.top;
+
+          // 基準点のキャンバス左端からの距離（CSSピクセル、旧スケール時）
+          const canvasContentLeft =
+            canvasRect.left - containerRect.left + container.scrollLeft;
+          const canvasContentTop =
+            canvasRect.top - containerRect.top + container.scrollTop;
+          const dxFromCanvas =
+            container.scrollLeft + viewportX - canvasContentLeft;
+          const dyFromCanvas =
+            container.scrollTop + viewportY - canvasContentTop;
+
+          const scaleRatio = newScale / prevScale;
+
+          // rAF内でReactのレンダリング後の実際のキャンバス位置を使って補正
+          window.requestAnimationFrame(() => {
+            if (!scrollContainerRef.current) return;
+            const c = scrollContainerRef.current;
+            const newCanvasRect = canvasEl.getBoundingClientRect();
+            const newContainerRect = c.getBoundingClientRect();
+
+            // レンダリング後のキャンバスのコンテンツ内位置
+            const newCanvasContentLeft =
+              newCanvasRect.left - newContainerRect.left + c.scrollLeft;
+            const newCanvasContentTop =
+              newCanvasRect.top - newContainerRect.top + c.scrollTop;
+
+            // 基準点のコンテンツ内新位置
+            const targetContentX =
+              newCanvasContentLeft + dxFromCanvas * scaleRatio;
+            const targetContentY =
+              newCanvasContentTop + dyFromCanvas * scaleRatio;
+
+            // 基準点がビューポート上の同じ位置に来るようスクロール
+            c.scrollLeft = targetContentX - viewportX;
+            c.scrollTop = targetContentY - viewportY;
+          });
+        }
+      }
+
+      return newScale;
+    });
+  };
 
   // Handle pinch-to-zoom and two-finger pan
   useEffect(() => {
@@ -2256,18 +2261,33 @@ function App() {
     }
   };
 
-  const handleBackgroundImageUpload = async (file: File) => {
+  const handleBackgroundImageUpload = async (files: FileList) => {
     try {
-      const bgImage = await uploadBackground(file);
-      // IndexedDB 版では url が Object URL
-      setBackgroundImage(bgImage.url);
+      const fileArray = Array.from(files);
+      for (const file of fileArray) {
+        const bgImage = await uploadBackground(file);
+        // IndexedDB 版では url が Object URL
+        setBackgroundImage(bgImage.url);
 
-      // 背景画像リストを更新
-      setBackgroundsList((prev) => [bgImage, ...prev]);
+        // 背景画像リストを更新
+        setBackgroundsList((prev) => [bgImage, ...prev]);
+      }
     } catch (err) {
       console.error("Failed to upload background:", err);
-      alert("背景画像のアップロードに失敗しました。");
+      alert("背景画像のアップロード中にエラーが発生しました。一部の画像が読み込まれていない可能性があります。");
     }
+  };
+
+  // handleDurationChange was here, now moved and fixed
+
+  const handleTapDurationChange = (newDuration: number) => {
+    if (!activeCommandId) return;
+    saveToHistory();
+    setCommands((prev) =>
+      prev.map((c) =>
+        c.id === activeCommandId ? { ...c, tapDuration: newDuration } : c,
+      ),
+    );
   };
 
   const handleDeleteBackground = async (id: string) => {
@@ -2366,6 +2386,26 @@ function App() {
     );
   };
 
+  const handleApplyWaitDurationToAll = (newDuration: number) => {
+    if (!activeCommandId) return;
+    saveToHistory();
+    setCommands((prev) =>
+      prev.map((c) => {
+        if (c.id !== activeCommandId) return c;
+        // 個別の待機時間を削除し、共通の待機時間を更新する
+        return {
+          ...c,
+          waitDuration: newDuration,
+          strokeMetadata: c.strokeMetadata ? c.strokeMetadata.map(meta => {
+            const newMeta = { ...meta };
+            delete newMeta.waitAfter;
+            return newMeta;
+          }) : undefined
+        };
+      })
+    );
+  };
+
   const handleSelectedStrokeWaitChange = (newDuration: number) => {
     if (!activeCommandId) return;
     saveToHistory();
@@ -2410,6 +2450,15 @@ function App() {
     return meta?.waitAfter; // Returns undefined if not set, UI shows default
   }, [selectedCommand, selectedStrokeIndex]);
 
+  const isTap = useMemo(() => {
+    if (!selectedCommand) return false;
+    if (selectionType === "stroke" && selectedStrokeIndex !== null) {
+      const stroke = selectedCommand.strokes[selectedStrokeIndex];
+      return stroke && stroke.length === 1;
+    }
+    return false;
+  }, [selectedCommand, selectionType, selectedStrokeIndex]);
+
   return (
     <div
       className="flex h-screen bg-gray-50 overflow-hidden font-sans text-gray-900"
@@ -2427,7 +2476,7 @@ function App() {
         className={`
             ${isLeftSidebarOpen ? "w-64" : "w-0"} 
             ${isFullscreen ? "absolute left-0 z-50 h-full shadow-2xl" : "fixed md:relative left-0 z-50 md:z-auto h-full shadow-2xl md:shadow-none"}
-            transition-all duration-300 ease-in-out flex-shrink-0 bg-white border-r border-gray-200 overflow-hidden
+            transition-all duration-300 ease-in-out shrink-0 bg-white border-r border-gray-200 overflow-hidden
         `}
       >
         <Sidebar
@@ -2458,6 +2507,12 @@ function App() {
               prev.map((c) =>
                 c.id === id ? { ...c, isVisible: !c.isVisible } : c,
               ),
+            );
+          }}
+          onToggleAllVisibility={(visible: boolean) => {
+            saveToHistory();
+            setCommands((prev) =>
+              prev.map((c) => ({ ...c, isVisible: visible }))
             );
           }}
           onFileUpload={handleFileUpload}
@@ -2847,7 +2902,7 @@ function App() {
                 ? "w-full md:w-72 h-[75vh] md:h-full translate-y-0 md:translate-y-0"
                 : "w-full md:w-0 h-[75vh] md:h-full translate-y-full md:translate-y-0"
             }
-            transition-all duration-300 ease-out flex-shrink-0 bg-white border-t md:border-t-0 md:border-l border-gray-200 overflow-hidden rounded-t-2xl md:rounded-none flex flex-col
+            transition-all duration-300 ease-out shrink-0 bg-white border-t md:border-t-0 md:border-l border-gray-200 overflow-hidden rounded-t-2xl md:rounded-none flex flex-col
         `}
       >
         {/* Mobile Bottom Sheet Handle & Close Button */}
@@ -2954,6 +3009,14 @@ function App() {
                 : 0.1
             }
             onWaitDurationChange={handleWaitDurationChange}
+            onApplyWaitToAll={handleApplyWaitDurationToAll}
+            isTap={isTap}
+            tapDuration={
+              selectedCommand?.tapDuration !== undefined
+                ? selectedCommand.tapDuration
+                : 0.05
+            }
+            onTapDurationChange={handleTapDurationChange}
             selectedStrokeWait={currentStrokeWait}
             onSelectedStrokeWaitChange={handleSelectedStrokeWaitChange}
             selectionType={selectionType}
