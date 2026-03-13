@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 
@@ -114,7 +115,7 @@ const DialogModal = ({
 
   return (
     <div
-      className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      className="fixed inset-0 z-99999 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={handleCancel}
     >
       <div

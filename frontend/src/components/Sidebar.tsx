@@ -46,6 +46,7 @@ interface SidebarProps {
   onBatchDelete: () => void;
   onSelectAll: () => void;
   onClearSelection: () => void;
+  onToggleAllVisibility: (visible: boolean) => void;
 
   // Project Management
   currentProjectId: string | null;
@@ -140,10 +141,10 @@ const SortableStrokeItem = React.memo(
           </div>
 
           <div
-            className={`w-2 h-2 rounded-full mr-2.5 flex-shrink-0 ${isSelected ? "bg-blue-500 ring-2 ring-blue-200" : "bg-gray-400"}`}
+            className={`w-2 h-2 rounded-full mr-2.5 shrink-0 ${isSelected ? "bg-blue-500 ring-2 ring-blue-200" : "bg-gray-400"}`}
           ></div>
           <span>アクション {index + 1}</span>
-          <span className="ml-2 text-[9px] uppercase tracking-wider text-gray-400 bg-white px-1 rounded border border-gray-100 flex-shrink-0">
+          <span className="ml-2 text-[9px] uppercase tracking-wider text-gray-400 bg-white px-1 rounded border border-gray-100 shrink-0">
             {isTap(stroke) ? "タップ" : "パス"}
           </span>
         </div>
@@ -354,7 +355,7 @@ const SortableCommandItem = React.memo(
             <div
               {...attributes}
               {...listeners}
-              className="mr-2 cursor-move text-gray-300 hover:text-gray-500 touch-none flex-shrink-0"
+              className="mr-2 cursor-move text-gray-300 hover:text-gray-500 touch-none shrink-0"
               onClick={(e) => e.stopPropagation()}
             >
               <svg
@@ -375,7 +376,7 @@ const SortableCommandItem = React.memo(
 
             {/* Checkbox for Multi-select */}
             <div
-              className="mr-2 flex-shrink-0 cursor-pointer"
+              className="mr-2 shrink-0 cursor-pointer"
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleMultiSelect(e);
@@ -403,7 +404,7 @@ const SortableCommandItem = React.memo(
 
             {/* Color Indicator */}
             <div
-              className="w-2.5 h-2.5 rounded-full mr-2.5 ring-1 ring-black/10 flex-shrink-0 shadow-sm"
+              className="w-2.5 h-2.5 rounded-full mr-2.5 ring-1 ring-black/10 shrink-0 shadow-sm"
               style={{ backgroundColor: command.color }}
             />
 
@@ -585,7 +586,7 @@ const SortableCommandItem = React.memo(
                         }}
                       >
                         <div
-                          className={`h-3 w-[2px] rounded-full ${selectedStrokeIndex === index - 1 && selectionType === "wait" ? "bg-blue-500" : "bg-gray-300"}`}
+                          className={`h-3 w-0.5 rounded-full ${selectedStrokeIndex === index - 1 && selectionType === "wait" ? "bg-blue-500" : "bg-gray-300"}`}
                         ></div>
                         <span
                           className={`text-[10px] ml-2 ${selectedStrokeIndex === index - 1 && selectionType === "wait" ? "text-blue-700 font-bold" : "text-gray-500"}`}
@@ -733,6 +734,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
     onBatchDelete,
     onSelectAll,
     onClearSelection,
+    onToggleAllVisibility,
     currentProjectId,
     projectsList,
     onLoadProject,
@@ -781,11 +783,11 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
   return (
     <div className="w-64 bg-white flex flex-col h-full border-r border-gray-300 font-sans shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)] z-10">
       {/* プロジェクトヘッダー */}
-      <div className="px-4 py-3 border-b border-gray-300 bg-gray-50 flex flex-col space-y-2 flex-shrink-0">
+      <div className="px-4 py-3 border-b border-gray-300 bg-gray-50 flex flex-col space-y-2 shrink-0">
         {/* 現在のプロジェクト名 + 保存ボタン */}
         <div className="flex items-center justify-between">
           <div className="flex items-center min-w-0 flex-1">
-            <span className="text-[9px] text-gray-400 uppercase tracking-wider mr-1.5 flex-shrink-0">
+            <span className="text-[9px] text-gray-400 uppercase tracking-wider mr-1.5 shrink-0">
               PRJ
             </span>
             <span
@@ -801,7 +803,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                 : "未保存"}
             </span>
           </div>
-          <div className="flex items-center space-x-1 flex-shrink-0">
+          <div className="flex items-center space-x-1 shrink-0">
             <button
               onClick={
                 hasUnsavedChanges || !currentProjectId
@@ -856,7 +858,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                   {p.name}
                 </span>
                 {/* 操作ボタン（ホバーで表示） */}
-                <div className="flex items-center space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-1">
+                <div className="flex items-center space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-1">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -907,7 +909,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
           </div>
         )}
       </div>
-      <div className="h-12 px-4 border-b border-gray-300 bg-gray-50 flex items-center justify-between flex-shrink-0">
+      <div className="h-12 px-4 border-b border-gray-300 bg-gray-50 flex items-center justify-between shrink-0">
         <h2 className="text-xs font-bold text-gray-600 tracking-wider uppercase">
           コマンド
         </h2>
@@ -976,14 +978,39 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                 : "bg-gray-50 border-gray-200"
             }`}
           >
-            {/* 1行目: 選択状況と全選択ボタン */}
+            {/* 1行目: 選択状況と全選択/表示トグルボタン */}
             <div className="flex items-center justify-between w-full">
               <span
                 className={`text-xs font-semibold ${checkedCommandIds.size > 0 ? "text-blue-800" : "text-gray-500"}`}
               >
                 {checkedCommandIds.size} 件選択中
               </span>
-              <div className="flex text-[10px] space-x-1">
+              <div className="flex text-[10px] space-x-1 items-center">
+                {commands.length > 0 && (
+                  <>
+                    <button
+                      onClick={() => {
+                        const isAllVisible = commands.every((c) => c.isVisible !== false);
+                        onToggleAllVisibility(!isAllVisible);
+                      }}
+                      className={`px-2 py-0.5 rounded transition-colors ${
+                        commands.every((c) => c.isVisible !== false)
+                          ? "text-gray-500 hover:text-gray-700 hover:bg-gray-200"
+                          : "text-blue-600 hover:text-blue-800 hover:bg-blue-100"
+                      }`}
+                      title={
+                        commands.every((c) => c.isVisible !== false)
+                          ? "すべてのコマンドを非表示"
+                          : "すべてのコマンドを表示"
+                      }
+                    >
+                      {commands.every((c) => c.isVisible !== false)
+                        ? "全て非表示"
+                        : "全て表示"}
+                    </button>
+                    <div className="w-px h-3 bg-gray-300"></div>
+                  </>
+                )}
                 <button
                   onClick={isAllSelected ? onClearSelection : onSelectAll}
                   className={`px-2 py-0.5 rounded transition-colors ${

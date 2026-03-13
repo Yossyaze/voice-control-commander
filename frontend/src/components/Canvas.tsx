@@ -330,43 +330,23 @@ const Canvas: React.FC<CanvasProps> = ({
           ctx.beginPath();
           ctx.moveTo(conn.from.x, conn.from.y);
           ctx.lineTo(conn.to.x, conn.to.y);
-          ctx.strokeStyle = "#9ca3af"; // gray-400
+          ctx.strokeStyle = conn.isSelected ? "#10B981" : "#9ca3af";
           ctx.setLineDash([5, 5]);
-          ctx.lineWidth = 1;
+          ctx.lineWidth = conn.isSelected ? 2 : 1;
           ctx.stroke();
           ctx.setLineDash([]); // Reset
 
-          // Draw Badge
           const midX = (conn.from.x + conn.to.x) / 2;
           const midY = (conn.from.y + conn.to.y) / 2;
 
-          ctx.fillStyle = conn.isSelected ? "#10B981" : "#9CA3AF";
-          ctx.font = "bold 12px sans-serif";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-
-          ctx.beginPath();
-          const padding = 6;
-          const textWidth = ctx.measureText(`${conn.duration}s`).width;
-          ctx.roundRect(
-            midX - textWidth / 2 - padding,
-            midY - 10,
-            textWidth + padding * 2,
-            20,
-            4,
-          );
-          ctx.fill();
-
-          ctx.fillStyle = "white";
-          ctx.fillText(`${conn.duration}s`, midX, midY);
-
-          // Store hit region
+          // 秒数の表示は削除し、中点付近のクリック判定(hit region)のみ残す
+          const hitSize = 30;
           badgesRef.current.push({
             rect: {
-              x: midX - textWidth / 2 - padding,
-              y: midY - 10,
-              w: textWidth + padding * 2,
-              h: 20,
+              x: midX - hitSize / 2,
+              y: midY - hitSize / 2,
+              w: hitSize,
+              h: hitSize,
             },
             strokeIndex: conn.strokeIndex,
           });
