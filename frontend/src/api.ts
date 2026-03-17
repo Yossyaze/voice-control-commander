@@ -93,7 +93,7 @@ export interface Command {
   name: string;
   points: Point[];
   strokes: Point[][];
-  strokeMetadata?: { waitAfter?: number }[];
+  strokeMetadata?: { waitAfter?: number; groupId?: string; tapDuration?: number }[];
   isVisible?: boolean;
   duration?: number;
   tapDuration?: number;

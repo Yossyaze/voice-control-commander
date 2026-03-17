@@ -718,6 +718,7 @@ export function createGestureData(
   strokes: Point[][],
   waits?: number[],
   tapDuration: number = 0.05,
+  strokeMetadata?: { waitAfter?: number; groupId?: string; tapDuration?: number }[],
 ): Uint8Array {
   const archiver = new NSKeyedArchiverWriter();
 
@@ -735,44 +736,73 @@ export function createGestureData(
   const eventUids: PlistUID[] = [];
   let touchId = 2;
 
-  for (let strokeIndex = 0; strokeIndex < strokes.length; strokeIndex++) {
-    const stroke = strokes[strokeIndex];
+  // 1. ストロークのグループ化
+  const strokeGroups: { strokes: Point[][]; originalIndices: number[]; groupId?: string }[] = [];
+  let currentGroup: { strokes: Point[][]; originalIndices: number[]; groupId?: string } | null = null;
 
-    if (strokeIndex > 0) {
+  for (let i = 0; i < strokes.length; i++) {
+    const groupId = strokeMetadata?.[i]?.groupId;
+    
+    if (groupId && currentGroup && currentGroup.groupId === groupId) {
+      currentGroup.strokes.push(strokes[i]);
+      currentGroup.originalIndices.push(i);
+    } else {
+      currentGroup = {
+        strokes: [strokes[i]],
+        originalIndices: [i],
+        groupId: groupId,
+      };
+      strokeGroups.push(currentGroup);
+    }
+  }
+
+  // 2. グループ単位でのイベント生成
+  for (let groupIndex = 0; groupIndex < strokeGroups.length; groupIndex++) {
+    const group = strokeGroups[groupIndex];
+    const firstOriginalIndex = group.originalIndices[0];
+
+    // --- 前のグループからのウェイトを加算 ---
+    if (firstOriginalIndex > 0) {
       let waitTime = 0.1;
-      if (waits && strokeIndex - 1 < waits.length) {
-        waitTime = waits[strokeIndex - 1];
+      const prevIndex = firstOriginalIndex - 1;
+      if (strokeMetadata && strokeMetadata[prevIndex] && strokeMetadata[prevIndex].waitAfter !== undefined) {
+        waitTime = strokeMetadata[prevIndex].waitAfter;
+      } else if (waits && prevIndex < waits.length) {
+        waitTime = waits[prevIndex];
       }
-      // ウェイトを置く前に、前のストロークの「Touch Up」は既に追加されているはず。
-      // ここではウェイト時間を加算する。
       currentTime += waitTime;
-      touchId += 1;
     }
 
-    // ストローク内の各ポイントを記録
-    for (let pointIndex = 0; pointIndex < stroke.length; pointIndex++) {
-      const p = stroke[pointIndex];
-      const pStr = `{${p.x.toFixed(6)}, ${p.y.toFixed(6)}}`;
-      const pointUid = archiver.archiveNSValuePoint(pStr);
-      const touchIdUid = archiver.addObject(touchId);
+    const groupTouchIds = group.strokes.map((_, i) => touchId + i);
+    touchId += group.strokes.length; // 次のグループ用
 
-      // Fingers 辞書
-      const fingersDictUid = archiver.archiveMutableDict(
-        [touchIdUid],
-        [pointUid],
-      );
+    const maxPoints = Math.max(...group.strokes.map(s => s.length));
 
-      // Forces 辞書
-      const forceValUid = archiver.addObject(new BplistReal(0.0));
-      const forcesDictUid = archiver.archiveMutableDict(
-        [touchIdUid],
-        [forceValUid],
-      );
+    // ストローク内の各フレーム(ポイント)を記録
+    for (let frameIndex = 0; frameIndex < maxPoints; frameIndex++) {
+      const activeTouchIds: PlistUID[] = [];
+      const pointUids: PlistUID[] = [];
+      const forceUids: PlistUID[] = [];
 
-      // タイムスタンプ
+      for (let i = 0; i < group.strokes.length; i++) {
+        const stroke = group.strokes[i];
+        const pointIndex = Math.min(frameIndex, stroke.length - 1);
+        const p = stroke[pointIndex];
+
+        const pStr = `{${p.x.toFixed(6)}, ${p.y.toFixed(6)}}`;
+        const pointUid = archiver.archiveNSValuePoint(pStr);
+        const tIdUid = archiver.addObject(groupTouchIds[i]);
+        const forceValUid = archiver.addObject(new BplistReal(0.0));
+
+        activeTouchIds.push(tIdUid);
+        pointUids.push(pointUid);
+        forceUids.push(forceValUid);
+      }
+
+      const fingersDictUid = archiver.archiveMutableDict(activeTouchIds, pointUids);
+      const forcesDictUid = archiver.archiveMutableDict(activeTouchIds, forceUids);
       const eventTimeUid = archiver.addObject(new BplistReal(currentTime));
 
-      // イベント辞書
       const eventUid = archiver.archiveDict(
         [fingersKeyUid, forcesKeyUid, timeKeyUid],
         [fingersDictUid, forcesDictUid, eventTimeUid],
@@ -784,19 +814,24 @@ export function createGestureData(
     }
 
     // --- タップ持続時間の適用 ---
-    // ストロークが1点のみ（タップ）の場合、指定された tapDuration 分だけ時間を進める
-    if (stroke.length === 1 && tapDuration > 0) {
-      // すでに1フレーム分(frameDuration)は進んでいるので、残りの時間を加算
-      const remainingTapWait = Math.max(0, tapDuration - frameDuration);
-      if (remainingTapWait > 0) {
-        currentTime += remainingTapWait;
+    // グループ全体がタップ（全ストローク長が1）の場合のみ持続時間を適用
+    if (maxPoints === 1) {
+      // メタデータから個別設定を取得を試みる
+      let effectiveTapDuration = tapDuration;
+      const firstIdx = group.originalIndices[0];
+      if (strokeMetadata?.[firstIdx]?.tapDuration !== undefined) {
+        effectiveTapDuration = strokeMetadata[firstIdx].tapDuration;
+      }
+
+      if (effectiveTapDuration > 0) {
+        const remainingTapWait = Math.max(0, effectiveTapDuration - frameDuration);
+        if (remainingTapWait > 0) {
+          currentTime += remainingTapWait;
+        }
       }
     }
 
-    // --- ストローク終了時の「Touch Up」イベントを追加 ---
-    // 最後のポイントと同じ時刻（1フレーム巻き戻し）にリフトを配置。
-    // currentTime はループ内で最後に +frameDuration されているため、
-    // 実際の最終ポイントの時刻は currentTime - frameDuration。
+    // --- グループ終了時の「Touch Up」イベントを追加 ---
     const liftTime = currentTime - frameDuration;
     const emptyDictUid = archiver.archiveMutableDict([], []);
     const liftTimeUid = archiver.addObject(new BplistReal(liftTime));
@@ -805,7 +840,6 @@ export function createGestureData(
       [emptyDictUid, emptyDictUid, liftTimeUid],
     );
     eventUids.push(liftEventUid);
-    // 余分な空白時間は入れない。次のストロークのウェイトはユーザー設定値のみで管理する。
   }
 
   // AllEvents 配列
@@ -838,6 +872,7 @@ export interface ExportCommandData {
   points?: Point[];
   strokes: Point[][];
   stroke_waits?: number[];
+  strokeMetadata?: { waitAfter?: number; groupId?: string; tapDuration?: number }[];
   tapDuration?: number;
 }
 
@@ -953,6 +988,7 @@ export function createCombinedPlist(
       strokesToUse,
       cmd.stroke_waits || [],
       cmd.tapDuration ?? 0.05,
+      cmd.strokeMetadata,
     );
 
     commandsTable[cmdId] = {

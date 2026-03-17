@@ -704,12 +704,19 @@ function App() {
   const [checkedCommandIds, setCheckedCommandIds] = useState<Set<string>>(
     new Set(),
   );
+  const [checkedStrokeIndices, setCheckedStrokeIndices] = useState<Set<number>>(
+    new Set(),
+  );
   const [selectedStrokeIndex, setSelectedStrokeIndex] = useState<number | null>(
     null,
   );
   const [selectionType, setSelectionType] = useState<"stroke" | "wait">(
     "stroke",
   );
+
+  useEffect(() => {
+    setCheckedStrokeIndices(new Set());
+  }, [activeCommandId]);
 
   // --- 履歴管理 (Undo / Redo) ---
   const [pastLevels, setPastLevels] = useState<Command[][]>([]);
@@ -916,7 +923,7 @@ function App() {
   // const [showSettingsPopup, setShowSettingsPopup] = useState<boolean>(false);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
 
-  const [markerPosition, setMarkerPosition] = useState<Point | null>(null);
+  const [markerPositions, setMarkerPositions] = useState<Point[]>([]);
 
   const appRef = useRef<HTMLDivElement>(null);
   const animationRef = useRef<number | null>(null);
@@ -939,89 +946,111 @@ function App() {
   // Animation Loop
   useEffect(() => {
     if (isPlaying && selectedCommand) {
-      // Build Timeline based on selection
+      // Build Sequential Groups based on groupId
+      // Blocks of actions that start at the same time
       const timeline: {
-        type: "stroke" | "wait";
+        startTime: number;
         duration: number;
-        strokeIndex?: number;
+        items: {
+          strokeIndex: number;
+          duration: number;
+        }[];
       }[] = [];
 
-      // Play ALL strokes in sequence
-      const waitTime =
-        selectedCommand.waitDuration !== undefined
-          ? selectedCommand.waitDuration
-          : 0.1;
-      selectedCommand.strokes.forEach((s, i) => {
-        if (i > 0) {
-          // Wait time BEFORE stroke i.
-          // Which is "Wait After" stroke i-1.
-          const prevStrokeWait =
-            selectedCommand.strokeMetadata?.[i - 1]?.waitAfter;
-          const actualWait =
-            prevStrokeWait !== undefined ? prevStrokeWait : waitTime;
-          timeline.push({ type: "wait", duration: actualWait });
-        }
-        timeline.push({
-          type: "stroke",
-          duration: Math.max(0.1, (s.length - 1) / 60),
-          strokeIndex: i,
-        });
-      });
+      let currentTime = 0;
+      const waitTime = selectedCommand.waitDuration !== undefined ? selectedCommand.waitDuration : 0.1;
 
-      const totalDuration = timeline.reduce(
-        (acc, item) => acc + item.duration,
-        0,
-      );
+      for (let i = 0; i < selectedCommand.strokes.length; i++) {
+        const metadata = selectedCommand.strokeMetadata?.[i];
+        const currentGroupId = metadata?.groupId;
+
+        // Determine duration for this stroke
+        const s = selectedCommand.strokes[i];
+        const strokeTapDuration = 
+          metadata?.tapDuration !== undefined
+            ? metadata.tapDuration
+            : (selectedCommand.tapDuration || 0.05);
+
+        const strokeDuration = s.length === 1 
+          ? strokeTapDuration 
+          : Math.max(0.1, (s.length - 1) / 60);
+
+        if (currentGroupId && i > 0 && selectedCommand.strokeMetadata?.[i - 1]?.groupId === currentGroupId) {
+          // Part of existing group - append to the last timeline block
+          const lastBlock = timeline[timeline.length - 1];
+          lastBlock.items.push({ strokeIndex: i, duration: strokeDuration });
+          lastBlock.duration = Math.max(lastBlock.duration, strokeDuration);
+        } else {
+          // New group or sequential action
+          // Wait time before this block (unless first)
+          if (i > 0) {
+            const prevWait = selectedCommand.strokeMetadata?.[i - 1]?.waitAfter;
+            currentTime += (prevWait !== undefined ? prevWait : waitTime);
+          }
+
+          timeline.push({
+            startTime: currentTime,
+            duration: strokeDuration,
+            items: [{ strokeIndex: i, duration: strokeDuration }]
+          });
+        }
+
+        // If not grouped with next, currentTime advances by group duration
+        const nextGroupId = selectedCommand.strokeMetadata?.[i + 1]?.groupId;
+        if (!currentGroupId || currentGroupId !== nextGroupId) {
+          currentTime += timeline[timeline.length - 1].duration;
+        }
+      }
+
+      const totalDuration = currentTime;
 
       const animate = (time: number) => {
         if (startTimeRef.current === null) {
           startTimeRef.current = time;
         }
 
-        const elapsed = (time - startTimeRef.current) / 1000; // seconds
+        const elapsed = (time - startTimeRef.current) / 1000;
 
         if (elapsed >= totalDuration) {
           setIsPlaying(false);
-          setMarkerPosition(null);
+          setMarkerPositions([]);
           startTimeRef.current = null;
           return;
         }
 
-        // Find current position
-        let runTime = 0;
-        let activeFound = false;
+        const currentMarkers: Point[] = [];
 
-        for (const item of timeline) {
-          if (elapsed >= runTime && elapsed < runTime + item.duration) {
-            if (item.type === "stroke" && item.strokeIndex !== undefined) {
-              const stroke = selectedCommand.strokes[item.strokeIndex];
-              const localProgress = (elapsed - runTime) / item.duration; // 0 to 1
-              if (stroke.length > 0) {
-                // Interpolate
-                const exactIndex = localProgress * (stroke.length - 1);
-                const idx = Math.floor(exactIndex);
-                const nextIdx = Math.min(idx + 1, stroke.length - 1);
-                const t = exactIndex - idx;
-                const p1 = stroke[idx];
-                const p2 = stroke[nextIdx];
-                setMarkerPosition({
-                  x: p1.x + (p2.x - p1.x) * t,
-                  y: p1.y + (p2.y - p1.y) * t,
-                });
-                activeFound = true;
+        // Check each block in timeline
+        for (const block of timeline) {
+          if (elapsed >= block.startTime && elapsed < block.startTime + block.duration) {
+            // This block is active
+            block.items.forEach(item => {
+              const localElapsed = elapsed - block.startTime;
+              if (localElapsed < item.duration) {
+                const stroke = selectedCommand.strokes[item.strokeIndex];
+                const progress = localElapsed / item.duration;
+                if (stroke.length > 0) {
+                  const exactIndex = progress * (stroke.length - 1);
+                  const idx = Math.floor(exactIndex);
+                  const nextIdx = Math.min(idx + 1, stroke.length - 1);
+                  const t = exactIndex - idx;
+                  const p1 = stroke[idx];
+                  const p2 = stroke[nextIdx];
+                  currentMarkers.push({
+                    x: p1.x + (p2.x - p1.x) * t,
+                    y: p1.y + (p2.y - p1.y) * t,
+                  });
+                }
+              } else {
+                // Stroke finished within block - stick to last point if grouped?
+                // For simplicity, just don't add marker if finished.
               }
-            } else {
-              // In wait period
-              setMarkerPosition(null);
-              activeFound = true;
-            }
-            break;
+            });
+            break; // found the active block
           }
-          runTime += item.duration;
         }
 
-        if (!activeFound) setMarkerPosition(null);
-
+        setMarkerPositions(currentMarkers);
         animationRef.current = requestAnimationFrame(animate);
       };
 
@@ -1030,7 +1059,7 @@ function App() {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
-      setTimeout(() => setMarkerPosition(null), 0);
+      setTimeout(() => setMarkerPositions([]), 0);
       startTimeRef.current = null;
     }
 
@@ -1039,7 +1068,7 @@ function App() {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isPlaying, selectedCommand, selectedStrokeIndex]);
+  }, [isPlaying, selectedCommand]);
 
   const togglePlay = useCallback(() => {
     setIsPlaying(!isPlaying);
@@ -1549,8 +1578,16 @@ function App() {
       ) {
         // Specific stroke
         const s = selectedCommand.strokes[selectedStrokeIndex];
-        // Allow shorter durations like 0.1s. Min 0.1s for safety.
-        return Math.max(0.05, Math.round(((s.length - 1) / 60) * 100) / 100);
+        // For tap (length 1), use tapDuration
+        if (s.length === 1) {
+          const strokeTapDuration = 
+            selectedCommand.strokeMetadata?.[selectedStrokeIndex]?.tapDuration;
+          return strokeTapDuration !== undefined 
+            ? strokeTapDuration 
+            : (selectedCommand.tapDuration || 0.05);
+        }
+        // Allow shorter durations like 0.1s. Min 0.1s for safety for paths.
+        return Math.max(0.1, Math.round(((s.length - 1) / 60) * 100) / 100);
       } else {
         // Total sequential time: Sum(strokes) + Sum(gaps)
         const waitTime =
@@ -1720,6 +1757,8 @@ function App() {
         points: [] as Point[],
         strokes: cmd.strokes,
         stroke_waits: strokeWaits,
+        tapDuration: cmd.tapDuration,
+        strokeMetadata: cmd.strokeMetadata,
       };
     });
 
@@ -1777,6 +1816,8 @@ function App() {
       points: [] as Point[],
       strokes: cmd.strokes,
       stroke_waits: strokeWaits,
+      tapDuration: cmd.tapDuration,
+      strokeMetadata: cmd.strokeMetadata,
     };
 
     try {
@@ -1848,6 +1889,7 @@ function App() {
           strokes: cmd.strokes,
           stroke_waits: strokeWaits,
           tapDuration: cmd.tapDuration,
+          strokeMetadata: cmd.strokeMetadata,
         };
       })
       .filter((c) => c !== null);
@@ -1945,6 +1987,58 @@ function App() {
 
   const handleClearCommandSelection = () => {
     setCheckedCommandIds(new Set());
+  };
+
+  const handleToggleSelectStroke = (index: number) => {
+    setCheckedStrokeIndices((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(index)) {
+        newSet.delete(index);
+      } else {
+        newSet.add(index);
+      }
+      return newSet;
+    });
+  };
+
+  const handleGroupStrokes = () => {
+    if (!activeCommandId || checkedStrokeIndices.size < 2) return;
+    saveToHistory();
+    const newGroupId = crypto.randomUUID();
+    setCommands((prev) =>
+      prev.map((cmd) => {
+        if (cmd.id !== activeCommandId) return cmd;
+        const newMetadata = [...(cmd.strokeMetadata || [])];
+        while (newMetadata.length < cmd.strokes.length) {
+          newMetadata.push({});
+        }
+        checkedStrokeIndices.forEach((idx) => {
+          if (idx < newMetadata.length) {
+            newMetadata[idx] = { ...newMetadata[idx], groupId: newGroupId };
+          }
+        });
+        return { ...cmd, strokeMetadata: newMetadata };
+      })
+    );
+    setCheckedStrokeIndices(new Set());
+  };
+
+  const handleUngroupStrokes = () => {
+    if (!activeCommandId || checkedStrokeIndices.size === 0) return;
+    saveToHistory();
+    setCommands((prev) =>
+      prev.map((cmd) => {
+        if (cmd.id !== activeCommandId) return cmd;
+        const newMetadata = [...(cmd.strokeMetadata || [])];
+        checkedStrokeIndices.forEach((idx) => {
+          if (idx < newMetadata.length && newMetadata[idx]) {
+            newMetadata[idx] = { ...newMetadata[idx], groupId: undefined };
+          }
+        });
+        return { ...cmd, strokeMetadata: newMetadata };
+      })
+    );
+    setCheckedStrokeIndices(new Set());
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleScaleChange = (
@@ -2284,9 +2378,25 @@ function App() {
     if (!activeCommandId) return;
     saveToHistory();
     setCommands((prev) =>
-      prev.map((c) =>
-        c.id === activeCommandId ? { ...c, tapDuration: newDuration } : c,
-      ),
+      prev.map((c) => {
+        if (c.id !== activeCommandId) return c;
+
+        // If a specific stroke is selected, only update that one
+        if (selectedStrokeIndex !== null) {
+          const newMetadata = [...(c.strokeMetadata || [])];
+          while (newMetadata.length <= selectedStrokeIndex) {
+            newMetadata.push({});
+          }
+          newMetadata[selectedStrokeIndex] = {
+            ...newMetadata[selectedStrokeIndex],
+            tapDuration: newDuration,
+          };
+          return { ...c, strokeMetadata: newMetadata };
+        }
+
+        // Otherwise update the command default
+        return { ...c, tapDuration: newDuration };
+      }),
     );
   };
 
@@ -2452,6 +2562,10 @@ function App() {
 
   const isTap = useMemo(() => {
     if (!selectedCommand) return false;
+    // If the whole command is a single tap, treat as tap even if not explicitly selected
+    if (selectedCommand.strokes.length === 1 && selectedCommand.strokes[0].length === 1) {
+      return true;
+    }
     if (selectionType === "stroke" && selectedStrokeIndex !== null) {
       const stroke = selectedCommand.strokes[selectedStrokeIndex];
       return stroke && stroke.length === 1;
@@ -2536,7 +2650,11 @@ function App() {
           onReorderCommands={handleReorderCommands}
           onReorderStrokes={handleReorderStrokes}
           checkedCommandIds={checkedCommandIds}
+          checkedStrokeIndices={checkedStrokeIndices}
           onToggleSelectCommand={handleToggleSelectCommand}
+          onToggleSelectStroke={handleToggleSelectStroke}
+          onGroupStrokes={handleGroupStrokes}
+          onUngroupStrokes={handleUngroupStrokes}
           onBatchExport={handleBatchExport}
           onBatchDelete={handleBatchDelete}
           onSelectAll={handleSelectAllCommands}
@@ -2797,7 +2915,7 @@ function App() {
                   if (!isRightSidebarOpen && !isFullscreen)
                     setIsRightSidebarOpen(true);
                 }}
-                markerPosition={markerPosition}
+                markerPositions={markerPositions}
                 scale={scale}
               />
             </div>
@@ -3012,9 +3130,9 @@ function App() {
             onApplyWaitToAll={handleApplyWaitDurationToAll}
             isTap={isTap}
             tapDuration={
-              selectedCommand?.tapDuration !== undefined
-                ? selectedCommand.tapDuration
-                : 0.05
+              selectedCommand && selectedStrokeIndex !== null && selectedCommand.strokeMetadata?.[selectedStrokeIndex]?.tapDuration !== undefined
+                ? selectedCommand.strokeMetadata[selectedStrokeIndex].tapDuration
+                : (selectedCommand?.tapDuration !== undefined ? selectedCommand.tapDuration : 0.05)
             }
             onTapDurationChange={handleTapDurationChange}
             selectedStrokeWait={currentStrokeWait}

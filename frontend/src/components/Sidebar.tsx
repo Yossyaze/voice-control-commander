@@ -48,6 +48,12 @@ interface SidebarProps {
   onClearSelection: () => void;
   onToggleAllVisibility: (visible: boolean) => void;
 
+  // Stroke Grouping / Multi-selection
+  checkedStrokeIndices?: Set<number>;
+  onToggleSelectStroke?: (index: number) => void;
+  onGroupStrokes?: () => void;
+  onUngroupStrokes?: () => void;
+
   // Project Management
   currentProjectId: string | null;
   projectsList: ProjectSummary[];
@@ -68,9 +74,15 @@ interface SortableStrokeItemProps {
   stroke: Point[];
 
   isSelected: boolean;
+  isMultiSelected?: boolean;
   onSelect: () => void;
+  onToggleMultiSelect?: (e: React.MouseEvent) => void;
   onDelete: () => void;
   isWait?: boolean; // Wait is technically gaps between strokes, confusing to sort?
+  groupId?: string;
+  isGroupedWithPrev?: boolean;
+  isGroupedWithNext?: boolean;
+  tapDuration?: number;
 }
 
 // Helper to determine if tap
@@ -82,8 +94,14 @@ const SortableStrokeItem = React.memo(
     index,
     stroke,
     isSelected,
+    isMultiSelected,
     onSelect,
+    onToggleMultiSelect,
     onDelete,
+    groupId,
+    isGroupedWithPrev,
+    isGroupedWithNext,
+    tapDuration,
   }: SortableStrokeItemProps) => {
     const {
       attributes,
@@ -105,19 +123,24 @@ const SortableStrokeItem = React.memo(
       <div
         ref={setNodeRef}
         style={style}
-        className={`flex items-center justify-between text-xs px-2 py-2 rounded-md cursor-pointer transition-colors border mb-1
+        className={`flex items-center justify-between text-xs px-2 py-2 cursor-pointer transition-colors border
                 ${
                   isSelected
                     ? "bg-blue-50 border-blue-300 text-blue-900 shadow-sm font-semibold"
-                    : "bg-gray-50 border-transparent text-gray-700 hover:bg-gray-100 hover:border-gray-200"
-                }`}
+                    : groupId
+                      ? "bg-indigo-50/50 border-indigo-200 text-gray-800 hover:bg-indigo-100"
+                      : "bg-gray-50 border-transparent text-gray-700 hover:bg-gray-100 hover:border-gray-200"
+                }
+                ${groupId ? "border-l-4 border-l-indigo-400" : "rounded-md mb-1"}
+                ${isGroupedWithPrev ? "rounded-t-none border-t-0 mt-0" : groupId ? "rounded-t-md mt-1" : ""}
+                ${isGroupedWithNext ? "rounded-b-none border-b-0 mb-0" : groupId ? "rounded-b-md mb-1" : ""}
+                `}
         onClick={(e) => {
           e.stopPropagation();
           onSelect();
         }}
       >
         <div className="flex items-center flex-1 min-w-0">
-          {/* Drag Handle */}
           <div
             {...attributes}
             {...listeners}
@@ -141,11 +164,38 @@ const SortableStrokeItem = React.memo(
           </div>
 
           <div
+            className="mr-2 shrink-0 cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleMultiSelect?.(e);
+            }}
+          >
+            <div
+              className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center transition-colors ${isMultiSelected ? "bg-blue-500 border-blue-500" : "bg-white border-gray-300 hover:border-blue-400"}`}
+            >
+              {isMultiSelected && (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-2.5 w-2.5 text-white"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              )}
+            </div>
+          </div>
+
+          <div
             className={`w-2 h-2 rounded-full mr-2.5 shrink-0 ${isSelected ? "bg-blue-500 ring-2 ring-blue-200" : "bg-gray-400"}`}
           ></div>
           <span>アクション {index + 1}</span>
           <span className="ml-2 text-[9px] uppercase tracking-wider text-gray-400 bg-white px-1 rounded border border-gray-100 shrink-0">
-            {isTap(stroke) ? "タップ" : "パス"}
+            {isTap(stroke) ? `タップ (${(tapDuration || 0.05).toFixed(2)}s)` : "パス"}
           </span>
         </div>
         {/* Delete Stroke Button */}
@@ -180,6 +230,11 @@ const SortableStrokeItem = React.memo(
       prevProps.id === nextProps.id &&
       prevProps.index === nextProps.index &&
       prevProps.isSelected === nextProps.isSelected &&
+      prevProps.isMultiSelected === nextProps.isMultiSelected &&
+      prevProps.groupId === nextProps.groupId &&
+      prevProps.isGroupedWithPrev === nextProps.isGroupedWithPrev &&
+      prevProps.isGroupedWithNext === nextProps.isGroupedWithNext &&
+      prevProps.tapDuration === nextProps.tapDuration &&
       prevProps.stroke.length === nextProps.stroke.length &&
       prevProps.stroke === nextProps.stroke
     );
@@ -273,6 +328,10 @@ interface SortableCommandItemProps {
   // Multi-selection
   isMultiSelected: boolean;
   onToggleMultiSelect: (e: React.MouseEvent) => void;
+  checkedStrokeIndices?: Set<number>;
+  onToggleSelectStroke?: (index: number) => void;
+  onGroupStrokes?: () => void;
+  onUngroupStrokes?: () => void;
 }
 
 const SortableCommandItem = React.memo(
@@ -294,6 +353,10 @@ const SortableCommandItem = React.memo(
     onReorderStrokes,
     isMultiSelected,
     onToggleMultiSelect,
+    checkedStrokeIndices,
+    onToggleSelectStroke,
+    onGroupStrokes,
+    onUngroupStrokes,
   }: SortableCommandItemProps) => {
     const {
       attributes,
@@ -547,70 +610,65 @@ const SortableCommandItem = React.memo(
                 )}
                 strategy={verticalListSortingStrategy}
               >
-                {command.strokes.map((stroke, index) => (
-                  <React.Fragment key={`${command.id}-stroke-${index}`}>
-                    {/* Wait (Gap) - Should we make wait sortable? No, wait belongs to the stroke after it or before it? 
-                                        In previous implementation, wait was "between" strokes. 
-                                        Actually logic: Wait is metadata for a stroke (waitAfter). 
-                                        Or wait is visual gap. 
-                                        If we sort strokes, waits (if attached to previous stroke) move with them.
-                                        But visual "Gap" click area is distinct.
-                                        Let's just show Wait as info *attached* to the top of the stroke, or separate div but not sortable.
-                                        If we sort, we sort STROKES. The wait duration belongs to the stroke metadata.
-                                        
-                                        Wait, `waitMetaData` usually means "Wait AFTER this stroke".
-                                        So if I have Stroke 1 (wait 1s), Stroke 2.
-                                        If I move Stroke 2 before Stroke 1.
-                                        The list becomes: Stroke 2, Stroke 1.
-                                        Stroke 1 still has "wait 1s" after it?
-                                        Yes.
-                                        
-                                        Visual representation:
-                                        [Wait X] (Previous Stroke's wait)
-                                        [Stroke Y]
-                                        
-                                        If I reorder, I am reordering the array of strokes.
-                                        Metadata array should also be reordered (handled in App.tsx).
-                                        
-                                        Let's just render the "Wait" block above the stroke if index > 0.
-                                        This "Wait" block is technically associated with (index-1), but visualized here.
-                                    */}
-                    {index > 0 && (
-                      <div
-                        className={`flex items-center justify-center py-1 cursor-pointer group/wait relative my-1 rounded
-                                                ${selectedStrokeIndex === index - 1 && selectionType === "wait" ? "bg-blue-50 opacity-100 ring-1 ring-blue-200" : "opacity-60 hover:opacity-100 hover:bg-gray-50"}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSelectStroke(index - 1);
-                          onSelectType?.("wait");
-                        }}
-                      >
-                        <div
-                          className={`h-3 w-0.5 rounded-full ${selectedStrokeIndex === index - 1 && selectionType === "wait" ? "bg-blue-500" : "bg-gray-300"}`}
-                        ></div>
-                        <span
-                          className={`text-[10px] ml-2 ${selectedStrokeIndex === index - 1 && selectionType === "wait" ? "text-blue-700 font-bold" : "text-gray-500"}`}
-                        >
-                          待機{" "}
-                          {command.strokeMetadata?.[index - 1]?.waitAfter ??
-                            command.waitDuration ??
-                            0.1}
-                          秒
-                        </span>
-                      </div>
-                    )}
+                {command.strokes.map((stroke, index) => {
+                  const currentGroupId = command.strokeMetadata?.[index]?.groupId;
+                  const prevGroupId = index > 0 ? command.strokeMetadata?.[index - 1]?.groupId : undefined;
+                  const nextGroupId = index < command.strokes.length - 1 ? command.strokeMetadata?.[index + 1]?.groupId : undefined;
 
-                    <SortableStrokeItem
-                      id={`${command.id}-stroke-${index}`}
-                      index={index}
-                      stroke={stroke}
-                      isSelected={
-                        selectedStrokeIndex === index &&
-                        selectionType === "stroke"
-                      }
-                      onSelect={() => {
+                  const isGroupedWithPrev = !!(currentGroupId && prevGroupId && currentGroupId === prevGroupId);
+                  const isGroupedWithNext = !!(currentGroupId && nextGroupId && currentGroupId === nextGroupId);
+
+                  return (
+                    <React.Fragment key={`${command.id}-stroke-${index}`}>
+                      {/* グループ化されているストローク間は待機時間を表示しない */}
+                      {index > 0 && !isGroupedWithPrev && (
+                        <div
+                          className={`flex items-center justify-center py-1 cursor-pointer group/wait relative my-1 rounded
+                                                  ${selectedStrokeIndex === index - 1 && selectionType === "wait" ? "bg-blue-50 opacity-100 ring-1 ring-blue-200" : "opacity-60 hover:opacity-100 hover:bg-gray-50"}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectStroke(index - 1);
+                            onSelectType?.("wait");
+                          }}
+                        >
+                          <div
+                            className={`h-3 w-0.5 rounded-full ${selectedStrokeIndex === index - 1 && selectionType === "wait" ? "bg-blue-500" : "bg-gray-300"}`}
+                          ></div>
+                          <span
+                            className={`text-[10px] ml-2 ${selectedStrokeIndex === index - 1 && selectionType === "wait" ? "text-blue-700 font-bold" : "text-gray-500"}`}
+                          >
+                            待機{" "}
+                            {command.strokeMetadata?.[index - 1]?.waitAfter ??
+                              command.waitDuration ??
+                              0.1}
+                            秒
+                          </span>
+                        </div>
+                      )}
+
+                      <SortableStrokeItem
+                        id={`${command.id}-stroke-${index}`}
+                        index={index}
+                        stroke={stroke}
+                        isSelected={
+                          selectedStrokeIndex === index &&
+                          selectionType === "stroke"
+                        }
+                        isMultiSelected={checkedStrokeIndices?.has(index)}
+                        groupId={currentGroupId}
+                        isGroupedWithPrev={isGroupedWithPrev}
+                        isGroupedWithNext={isGroupedWithNext}
+                        tapDuration={
+                          command.strokeMetadata?.[index]?.tapDuration ?? 
+                          command.tapDuration ?? 
+                          0.05
+                        }
+                        onSelect={() => {
                         onSelectStroke(index);
                         onSelectType?.("stroke");
+                      }}
+                      onToggleMultiSelect={() => {
+                        onToggleSelectStroke?.(index);
                       }}
                       onDelete={() => {
                         const newStrokes = [...command.strokes];
@@ -625,9 +683,35 @@ const SortableCommandItem = React.memo(
                       }}
                     />
                   </React.Fragment>
-                ))}
+                );
+              })}
               </SortableContext>
             </DndContext>
+
+            {/* Stroke Grouping Buttons */}
+            {checkedStrokeIndices && checkedStrokeIndices.size > 0 && (
+              <div className="flex space-x-2 my-2 w-full">
+                <button
+                  onClick={onGroupStrokes}
+                  disabled={checkedStrokeIndices.size < 2}
+                  className={`flex-1 p-1.5 border rounded text-xs transition-colors shadow-sm ${
+                    checkedStrokeIndices.size >= 2
+                      ? "bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100"
+                      : "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
+                  }`}
+                  title="選択したアクションを同時に実行するようにグループ化"
+                >
+                  グループ化
+                </button>
+                <button
+                  onClick={onUngroupStrokes}
+                  className={`flex-1 p-1.5 border rounded text-xs transition-colors shadow-sm bg-white border-gray-200 text-gray-600 hover:bg-gray-50`}
+                  title="選択したアクションのグループを解除"
+                >
+                  グループ解除
+                </button>
+              </div>
+            )}
 
             {/* Add Action Buttons */}
             <div className="pt-3 pb-1 flex justify-center space-x-2 border-t border-dashed border-gray-200 mt-2">
@@ -702,7 +786,8 @@ const SortableCommandItem = React.memo(
       prevProps.isMultiSelected === nextProps.isMultiSelected &&
       prevProps.editingId === nextProps.editingId &&
       prevProps.selectedStrokeIndex === nextProps.selectedStrokeIndex &&
-      prevProps.selectionType === nextProps.selectionType
+      prevProps.selectionType === nextProps.selectionType &&
+      prevProps.checkedStrokeIndices === nextProps.checkedStrokeIndices
     );
   },
 );
@@ -735,6 +820,10 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
     onSelectAll,
     onClearSelection,
     onToggleAllVisibility,
+    checkedStrokeIndices,
+    onToggleSelectStroke,
+    onGroupStrokes,
+    onUngroupStrokes,
     currentProjectId,
     projectsList,
     onLoadProject,
@@ -1101,6 +1190,10 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                     onToggleMultiSelect={() => {
                       onToggleSelectCommand(cmd.id, false); // Just toggle
                     }}
+                    checkedStrokeIndices={checkedStrokeIndices}
+                    onToggleSelectStroke={onToggleSelectStroke}
+                    onGroupStrokes={onGroupStrokes}
+                    onUngroupStrokes={onUngroupStrokes}
                   />
                 ))}
               </ul>

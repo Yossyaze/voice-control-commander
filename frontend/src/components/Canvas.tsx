@@ -34,6 +34,7 @@ interface CanvasProps {
   onPan?: (dx: number, dy: number) => void;
 
   markerPosition?: { x: number; y: number } | null;
+  markerPositions?: { x: number; y: number }[];
   scale?: number;
   connections?: {
     from: Point;
@@ -56,6 +57,7 @@ const Canvas: React.FC<CanvasProps> = ({
   onPathDrag,
   onSelectCommand,
   markerPosition = null,
+  markerPositions = [],
   scale = 1.0,
   connections = [],
   onSelectWait,
@@ -312,14 +314,19 @@ const Canvas: React.FC<CanvasProps> = ({
       });
 
       // Draw playback marker if present
-      if (markerPosition) {
-        ctx.beginPath();
-        ctx.arc(markerPosition.x, markerPosition.y, 6, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(59, 130, 246, 0.8)"; // blue-500
-        ctx.fill();
-        ctx.strokeStyle = "white";
-        ctx.lineWidth = 2;
-        ctx.stroke();
+      const allMarkers = [...markerPositions];
+      if (markerPosition) allMarkers.push(markerPosition);
+
+      if (allMarkers.length > 0) {
+        allMarkers.forEach((pos) => {
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, 6, 0, Math.PI * 2);
+          ctx.fillStyle = "rgba(59, 130, 246, 0.8)"; // blue-500
+          ctx.fill();
+          ctx.strokeStyle = "white";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        });
       }
 
       // Draw Connections (Wait Gaps)
