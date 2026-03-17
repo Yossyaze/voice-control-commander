@@ -34,6 +34,10 @@ interface DeviceModel {
   category: "iPhone" | "iPad";
 }
 
+const revokeBackgroundUrls = (backgrounds: BackgroundImage[]) => {
+  backgrounds.forEach((bg) => URL.revokeObjectURL(bg.url));
+};
+
 // Comprehensive List of Apple Devices
 const DEVICE_MODELS: DeviceModel[] = [
   // iPhone 16 Series
@@ -771,15 +775,30 @@ function App() {
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
 
   const [backgroundsList, setBackgroundsList] = useState<BackgroundImage[]>([]);
+  const backgroundsListRef = useRef<BackgroundImage[]>([]);
   // 背景リストの初回ロードが完了したかどうかのフラグ
   const [isBackgroundsLoaded, setIsBackgroundsLoaded] = useState(false);
+
+  useEffect(() => {
+    backgroundsListRef.current = backgroundsList;
+  }, [backgroundsList]);
+
+  useEffect(() => {
+    return () => {
+      revokeBackgroundUrls(backgroundsListRef.current);
+    };
+  }, []);
 
   // 起動時に背景画像リストを取得
   useEffect(() => {
     const loadBackgrounds = async () => {
       try {
+        setBackgroundImage(null);
         const bgData = await fetchBackgrounds();
-        setBackgroundsList(bgData);
+        setBackgroundsList((prev) => {
+          revokeBackgroundUrls(prev);
+          return bgData;
+        });
 
         // localStorage から最後に使用した背景IDを復元
         const savedBgId = loadState<string | null>("backgroundImageId", null);

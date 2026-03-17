@@ -370,6 +370,7 @@ const Canvas: React.FC<CanvasProps> = ({
     showGrid,
     showPoints,
     markerPosition,
+    markerPositions,
     connections,
     scale, // Added scale to dependencies
   ]);
