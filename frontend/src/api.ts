@@ -506,6 +506,7 @@ const BG_STORE_NAME = "backgrounds";
 export interface BackgroundImage {
   id: string;
   url: string; // Object URL（表示用、メモリ上のみ）
+  groupName: string | null;
 }
 
 /** IndexedDB に保存する背景画像レコード */
@@ -513,6 +514,7 @@ interface BackgroundRecord {
   id: string;
   blob: Blob;
   createdAt: number; // タイムスタンプ（ソート用）
+  groupName: string | null;
 }
 
 /** IndexedDB のデータベースを開く */
@@ -565,6 +567,7 @@ async function migrateFromLocalStorage(): Promise<void> {
           id: item.id,
           blob,
           createdAt: Date.now() - i, // 順序を維持（先頭が最新）
+          groupName: null,
         };
         store.put(record);
       } catch {
@@ -607,6 +610,7 @@ export async function fetchBackgrounds(): Promise<BackgroundImage[]> {
       const images: BackgroundImage[] = records.map((r) => ({
         id: r.id,
         url: URL.createObjectURL(r.blob),
+        groupName: r.groupName ?? null,
       }));
       dbInstance.close();
       resolve(images);
@@ -628,6 +632,7 @@ export async function uploadBackground(file: File): Promise<BackgroundImage> {
     id,
     blob,
     createdAt: Date.now(),
+    groupName: null,
   };
 
   const dbInstance = await openBgDb();
@@ -640,7 +645,43 @@ export async function uploadBackground(file: File): Promise<BackgroundImage> {
   });
   dbInstance.close();
 
-  return { id, url: URL.createObjectURL(blob) };
+  return { id, url: URL.createObjectURL(blob), groupName: null };
+}
+
+/** 背景画像のグループ名を更新 */
+export async function updateBackgroundGroup(
+  id: string,
+  groupName: string | null,
+): Promise<void> {
+  const normalizedGroupName = groupName?.trim() || null;
+  const dbInstance = await openBgDb();
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = dbInstance.transaction(BG_STORE_NAME, "readwrite");
+      const store = tx.objectStore(BG_STORE_NAME);
+      const request = store.get(id);
+
+      request.onsuccess = () => {
+        const record = request.result as BackgroundRecord | undefined;
+        if (!record) {
+          reject(new Error("Background image not found"));
+          return;
+        }
+
+        store.put({
+          ...record,
+          groupName: normalizedGroupName,
+        });
+      };
+
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      request.onerror = () => reject(request.error);
+    });
+  } finally {
+    dbInstance.close();
+  }
 }
 
 /** 背景画像を削除 */

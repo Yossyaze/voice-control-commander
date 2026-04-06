@@ -1,4 +1,10 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import { type BackgroundImage } from "../api";
 import { useDialog } from "../contexts/DialogContext";
 
@@ -23,7 +29,12 @@ interface ControlPanelProps {
   selectedBackgroundImageUrl?: string | null;
   onClearBackgroundImage: () => void;
   backgroundsList?: BackgroundImage[];
+  backgroundFolders?: string[];
   onDeleteBackground?: (id: string) => void;
+  onUpdateBackgroundGroup?: (id: string, groupName: string | null) => void;
+  onCreateBackgroundFolder?: (folderName: string) => void;
+  onRenameBackgroundFolder?: (currentName: string, nextName: string) => void;
+  onDeleteBackgroundFolder?: (folderName: string) => void;
   showGrid: boolean;
   onToggleGrid: (show: boolean) => void;
   showPoints: boolean;
@@ -157,7 +168,12 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   selectedBackgroundImageUrl,
   onClearBackgroundImage,
   backgroundsList = [],
+  backgroundFolders = [],
   onDeleteBackground,
+  onUpdateBackgroundGroup,
+  onCreateBackgroundFolder,
+  onRenameBackgroundFolder,
+  onDeleteBackgroundFolder,
   showGrid,
   onToggleGrid,
   showPoints,
@@ -216,6 +232,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   const [activeTab, setActiveTab] = useState<"action" | "environment">(
     "action",
   );
+  const [selectedFolderKey, setSelectedFolderKey] = useState<string>("__all__");
 
   const stopPress = useCallback(() => {
     if (pressTimerRef.current !== null)
@@ -278,6 +295,97 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     return stopNudgePress;
   }, [stopNudgePress]);
   // ------------------------------------
+
+  const folderItems = useMemo(() => {
+    const normalizedFolders = Array.from(
+      new Set(
+        backgroundFolders
+          .map((name) => name.trim())
+          .filter((name) => name.length > 0),
+      ),
+    );
+
+    const countMap = new Map<string, number>();
+    backgroundsList.forEach((bg) => {
+      const key = bg.groupName?.trim() || "";
+      countMap.set(key, (countMap.get(key) || 0) + 1);
+    });
+
+    const items: { key: string; name: string | null; label: string; count: number }[] = [
+      {
+        key: "__all__",
+        name: null,
+        label: "すべて",
+        count: backgroundsList.length,
+      },
+      {
+        key: "__ungrouped__",
+        name: null,
+        label: "未分類",
+        count: countMap.get("") || 0,
+      },
+    ];
+
+    normalizedFolders.forEach((name) => {
+      items.push({
+        key: `folder:${name}`,
+        name,
+        label: name,
+        count: countMap.get(name) || 0,
+      });
+    });
+
+    // 画像にだけ存在してフォルダー一覧にない名前を補完
+    Array.from(countMap.keys())
+      .filter((key) => key.length > 0)
+      .forEach((name) => {
+        if (!normalizedFolders.includes(name)) {
+          items.push({
+            key: `folder:${name}`,
+            name,
+            label: name,
+            count: countMap.get(name) || 0,
+          });
+        }
+      });
+
+    return items;
+  }, [backgroundFolders, backgroundsList]);
+
+  useEffect(() => {
+    if (folderItems.some((item) => item.key === selectedFolderKey)) return;
+    setSelectedFolderKey("__all__");
+  }, [folderItems, selectedFolderKey]);
+
+  const visibleBackgrounds = useMemo(() => {
+    if (selectedFolderKey === "__all__") return backgroundsList;
+    if (selectedFolderKey === "__ungrouped__") {
+      return backgroundsList.filter((bg) => !bg.groupName?.trim());
+    }
+    if (selectedFolderKey.startsWith("folder:")) {
+      const folderName = selectedFolderKey.replace("folder:", "");
+      return backgroundsList.filter(
+        (bg) => (bg.groupName?.trim() || "") === folderName,
+      );
+    }
+    return backgroundsList;
+  }, [backgroundsList, selectedFolderKey]);
+
+  const folderNameOptions = useMemo(
+    () =>
+      folderItems
+        .filter((item) => item.key.startsWith("folder:") && item.name)
+        .map((item) => item.name as string),
+    [folderItems],
+  );
+
+  const selectedFolder = folderItems.find((item) => item.key === selectedFolderKey);
+  const selectedBackground = useMemo(() => {
+    if (!selectedBackgroundImageUrl) return null;
+    return (
+      backgroundsList.find((bg) => bg.url === selectedBackgroundImageUrl) || null
+    );
+  }, [backgroundsList, selectedBackgroundImageUrl]);
 
   return (
     <div className="w-full bg-white flex flex-col h-full font-sans z-20 overflow-hidden">
@@ -651,33 +759,138 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 </button>
               </div>
 
-              {/* Background Image Gallery */}
-              {backgroundsList.length > 0 && (
-                <div className="mt-2 text-xs">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-gray-500 font-medium">
-                      履歴から選ぶ
-                    </span>
+              {/* Background Folder Gallery */}
+              <div className="mt-2 text-xs">
+                <div className="flex justify-between items-center mb-1.5">
+                  <span className="text-gray-500 font-medium">背景フォルダー</span>
+                  <button
+                    onClick={async () => {
+                      if (!onCreateBackgroundFolder) return;
+                      const name = await prompt("新しいフォルダー名を入力してください:");
+                      if (name && name.trim()) {
+                        onCreateBackgroundFolder(name.trim());
+                        setSelectedFolderKey(`folder:${name.trim()}`);
+                      }
+                    }}
+                    className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px] text-gray-600 hover:border-blue-300 hover:text-blue-600"
+                    title="フォルダーを作成"
+                  >
+                    + フォルダー
+                  </button>
+                </div>
+
+                <div className="rounded border border-gray-200 bg-gray-50 p-1.5">
+                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                    {folderItems.map((folder) => (
+                      <button
+                        key={folder.key}
+                        onClick={() => setSelectedFolderKey(folder.key)}
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] transition-colors border ${
+                          selectedFolderKey === folder.key
+                            ? "bg-blue-600 text-white border-blue-600"
+                            : "bg-white text-gray-700 border-gray-200 hover:border-blue-300"
+                        }`}
+                      >
+                        <span className="max-w-[90px] truncate">{folder.label}</span>
+                        <span className="opacity-80">{folder.count}</span>
+                      </button>
+                    ))}
                   </div>
-                  <div className="grid grid-cols-4 gap-2">
-                    {backgroundsList.map((bg) => (
+
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                      表示中: {selectedFolder?.label || "すべて"}
+                    </span>
+                    {selectedFolder?.name && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={async () => {
+                            if (!onRenameBackgroundFolder || !selectedFolder.name)
+                              return;
+                            const name = await prompt(
+                              "新しいフォルダー名を入力してください:",
+                              selectedFolder.name,
+                            );
+                            if (!name || !name.trim()) return;
+                            await onRenameBackgroundFolder(
+                              selectedFolder.name,
+                              name.trim(),
+                            );
+                            setSelectedFolderKey(`folder:${name.trim()}`);
+                          }}
+                          className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px] text-gray-600 hover:border-amber-300 hover:text-amber-600"
+                        >
+                          名前変更
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (!onDeleteBackgroundFolder || !selectedFolder.name)
+                              return;
+                            const confirmed = await confirm(
+                              `フォルダー「${selectedFolder.name}」を削除しますか？\n画像は未分類に移動されます。`,
+                            );
+                            if (!confirmed) return;
+                            await onDeleteBackgroundFolder(selectedFolder.name);
+                            setSelectedFolderKey("__ungrouped__");
+                          }}
+                          className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px] text-gray-600 hover:border-red-300 hover:text-red-600"
+                        >
+                          削除
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-2 rounded border border-gray-200 bg-white p-2">
+                  <div className="text-[10px] text-gray-400 mb-1">選択中画像の登録先フォルダー</div>
+                  <select
+                    value={selectedBackground?.groupName?.trim() || ""}
+                    onChange={(e) =>
+                      selectedBackground &&
+                      onUpdateBackgroundGroup?.(
+                        selectedBackground.id,
+                        e.target.value || null,
+                      )
+                    }
+                    disabled={!selectedBackground}
+                    className="w-full rounded border border-gray-200 bg-gray-50 px-2 py-1 text-[11px] text-gray-700 focus:border-blue-400 focus:bg-white focus:outline-none disabled:opacity-50"
+                    title={
+                      selectedBackground
+                        ? "選択中画像のフォルダーを変更"
+                        : "先に画像を選択してください"
+                    }
+                  >
+                    <option value="">未分類</option>
+                    {folderNameOptions.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {visibleBackgrounds.length > 0 ? (
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    {visibleBackgrounds.map((bg) => (
                       <div
                         key={bg.id}
-                        className={`relative group cursor-pointer aspect-square rounded overflow-hidden border transition-colors ${
+                        className={`relative group cursor-pointer rounded overflow-hidden border transition-colors bg-white ${
                           selectedBackgroundImageUrl === bg.url
                             ? "border-blue-500 ring-2 ring-blue-200"
                             : "border-gray-200 hover:border-blue-400 hover:shadow-sm"
                         }`}
                         onClick={() =>
-                          onBackgroundImageSelect &&
-                          onBackgroundImageSelect(bg.url)
+                          onBackgroundImageSelect && onBackgroundImageSelect(bg.url)
                         }
                       >
-                        <img
-                          src={bg.url}
-                          alt="Background Thumbnail"
-                          className="object-cover w-full h-full"
-                        />
+                        <div className="aspect-square">
+                          <img
+                            src={bg.url}
+                            alt="Background Thumbnail"
+                            className="object-cover w-full h-full"
+                          />
+                        </div>
                         {selectedBackgroundImageUrl === bg.url && (
                           <span className="absolute left-1 top-1 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-semibold text-white shadow">
                             選択中
@@ -687,8 +900,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                           onClick={async (e) => {
                             e.stopPropagation();
                             if (onDeleteBackground) {
-                              const confirmed =
-                                await confirm("この背景画像を削除しますか？");
+                              const confirmed = await confirm(
+                                "この背景画像を削除しますか？",
+                              );
                               if (confirmed) {
                                 onDeleteBackground(bg.id);
                               }
@@ -714,8 +928,13 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                       </div>
                     ))}
                   </div>
+                ) : (
+                  <div className="mt-2 rounded border border-dashed border-gray-200 bg-gray-50 px-3 py-6 text-center text-[10px] text-gray-400">
+                    このフォルダーに背景画像はありません
+                  </div>
+                )}
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </div>{" "}
@@ -723,7 +942,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         {/* Action Settings Tab */}
         <div className={activeTab === "action" ? "space-y-6" : "hidden"}>
           {/* Selected Item Properties (Contextual) */}
-          {!selectionType || selectionType === "stroke" ? (
+          {(!selectionType || selectionType === "stroke") && (
             <div
               className={`space-y-4 pt-4 border-t border-gray-100 ${!isActionSelected ? "opacity-50 pointer-events-none grayscale" : ""}`}
             >
@@ -1235,8 +1454,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 </div>
               </div>
             </div>
-          ) : (
-            // Wait Properties
+            )}
+
+          {selectionType === "wait" && (
             <div className="space-y-4 pt-4 border-t border-gray-100">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
@@ -1332,9 +1552,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               </div>
             </div>
           )}
-        </div>{" "}
+        </div>
         {/* End Action Settings Tab */}
-      </div>
 
       {/* Bottom Static Section: Playback & Export */}
       <div className="p-3 border-t border-gray-200 bg-gray-50 shrink-0 space-y-2">

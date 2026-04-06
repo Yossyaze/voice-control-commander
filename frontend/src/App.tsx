@@ -23,6 +23,7 @@ import {
   fetchBackgrounds,
   uploadBackground,
   deleteBackground,
+  updateBackgroundGroup,
 } from "./api";
 
 // Define Device Model Interface
@@ -774,9 +775,16 @@ function App() {
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
 
   const [backgroundsList, setBackgroundsList] = useState<BackgroundImage[]>([]);
+  const [backgroundFolders, setBackgroundFolders] = useState<string[]>(() =>
+    loadState<string[]>("backgroundFolders", []),
+  );
   const backgroundsListRef = useRef<BackgroundImage[]>([]);
   // 背景リストの初回ロードが完了したかどうかのフラグ
   const [isBackgroundsLoaded, setIsBackgroundsLoaded] = useState(false);
+
+  useEffect(() => {
+    saveState("backgroundFolders", backgroundFolders);
+  }, [backgroundFolders]);
 
   useEffect(() => {
     backgroundsListRef.current = backgroundsList;
@@ -797,6 +805,22 @@ function App() {
         setBackgroundsList((prev) => {
           revokeBackgroundUrls(prev);
           return bgData;
+        });
+
+        // 背景画像からフォルダー名を補完してマージ
+        const loadedFolders = Array.from(
+          new Set(
+            bgData
+              .map((bg) => bg.groupName?.trim())
+              .filter((name): name is string => Boolean(name)),
+          ),
+        );
+        setBackgroundFolders((prev) => {
+          const merged = new Set([
+            ...prev.map((name) => name.trim()).filter(Boolean),
+            ...loadedFolders,
+          ]);
+          return Array.from(merged);
         });
 
         // localStorage から最後に使用した背景IDを復元
@@ -2442,6 +2466,114 @@ function App() {
     }
   };
 
+  const handleUpdateBackgroundGroup = async (
+    id: string,
+    groupName: string | null,
+  ) => {
+    try {
+      const normalizedGroupName = groupName?.trim() || null;
+      await updateBackgroundGroup(id, normalizedGroupName);
+      setBackgroundsList((prev) =>
+        prev.map((bg) =>
+          bg.id === id ? { ...bg, groupName: normalizedGroupName } : bg,
+        ),
+      );
+      if (normalizedGroupName) {
+        setBackgroundFolders((prev) => {
+          if (prev.includes(normalizedGroupName)) return prev;
+          return [...prev, normalizedGroupName];
+        });
+      }
+    } catch (err) {
+      console.error("Failed to update background group:", err);
+      alert("背景画像のグループ変更に失敗しました。");
+    }
+  };
+
+  const handleCreateBackgroundFolder = (folderName: string) => {
+    const normalizedName = folderName.trim();
+    if (!normalizedName) return;
+
+    setBackgroundFolders((prev) => {
+      if (prev.includes(normalizedName)) {
+        alert("同名のフォルダーが既に存在します。");
+        return prev;
+      }
+      return [...prev, normalizedName];
+    });
+  };
+
+  const handleRenameBackgroundFolder = async (
+    currentName: string,
+    nextName: string,
+  ) => {
+    const current = currentName.trim();
+    const next = nextName.trim();
+    if (!current || !next || current === next) return;
+
+    if (backgroundFolders.includes(next)) {
+      alert("同名のフォルダーが既に存在します。");
+      return;
+    }
+
+    try {
+      const targetImages = backgroundsList.filter(
+        (bg) => (bg.groupName?.trim() || "") === current,
+      );
+
+      if (targetImages.length > 0) {
+        await Promise.all(
+          targetImages.map((bg) => updateBackgroundGroup(bg.id, next)),
+        );
+      }
+
+      setBackgroundsList((prev) =>
+        prev.map((bg) =>
+          (bg.groupName?.trim() || "") === current
+            ? { ...bg, groupName: next }
+            : bg,
+        ),
+      );
+      setBackgroundFolders((prev) =>
+        prev.map((name) => (name === current ? next : name)),
+      );
+    } catch (err) {
+      console.error("Failed to rename background folder:", err);
+      alert("フォルダー名の変更に失敗しました。");
+    }
+  };
+
+  const handleDeleteBackgroundFolder = async (folderName: string) => {
+    const normalizedName = folderName.trim();
+    if (!normalizedName) return;
+
+    try {
+      const targetImages = backgroundsList.filter(
+        (bg) => (bg.groupName?.trim() || "") === normalizedName,
+      );
+
+      if (targetImages.length > 0) {
+        await Promise.all(
+          targetImages.map((bg) => updateBackgroundGroup(bg.id, null)),
+        );
+      }
+
+      setBackgroundsList((prev) =>
+        prev.map((bg) =>
+          (bg.groupName?.trim() || "") === normalizedName
+            ? { ...bg, groupName: null }
+            : bg,
+        ),
+      );
+      setBackgroundFolders((prev) =>
+        prev.filter((name) => name !== normalizedName),
+      );
+    } catch (err) {
+      console.error("Failed to delete background folder:", err);
+      alert("フォルダーの削除に失敗しました。");
+    }
+  };
+
   const handleClearBackgroundImage = () => setBackgroundImage(null);
   const handleToggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -3084,7 +3216,12 @@ function App() {
             selectedBackgroundImageUrl={backgroundImage}
             onClearBackgroundImage={handleClearBackgroundImage}
             backgroundsList={backgroundsList}
+            backgroundFolders={backgroundFolders}
             onDeleteBackground={handleDeleteBackground}
+            onUpdateBackgroundGroup={handleUpdateBackgroundGroup}
+            onCreateBackgroundFolder={handleCreateBackgroundFolder}
+            onRenameBackgroundFolder={handleRenameBackgroundFolder}
+            onDeleteBackgroundFolder={handleDeleteBackgroundFolder}
             showGrid={showGrid}
             onToggleGrid={() => setShowGrid(!showGrid)}
             showPoints={showPoints}
