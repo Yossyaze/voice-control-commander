@@ -20,6 +20,7 @@ interface ControlPanelProps {
   onSelectOrientation: (orientation: "portrait" | "landscape") => void;
   onBackgroundImageUpload: (files: FileList) => void;
   onBackgroundImageSelect?: (url: string) => void;
+  selectedBackgroundImageUrl?: string | null;
   onClearBackgroundImage: () => void;
   backgroundsList?: BackgroundImage[];
   onDeleteBackground?: (id: string) => void;
@@ -153,6 +154,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   onExport,
   onBackgroundImageUpload,
   onBackgroundImageSelect,
+  selectedBackgroundImageUrl,
   onClearBackgroundImage,
   backgroundsList = [],
   onDeleteBackground,
@@ -375,13 +377,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                       <div className="flex items-center space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-1">
                         {/* 上書き保存 */}
                         <button
-                          onClick={async () => {
-                            const confirmed = await confirm(
-                              `「${env.name}」を現在の設定で上書きしますか？`,
-                            );
-                            if (confirmed) {
-                              if (onOverwriteEnvironment)
-                                onOverwriteEnvironment(env.id);
+                          onClick={() => {
+                            if (onOverwriteEnvironment) {
+                              onOverwriteEnvironment(env.id);
                             }
                           }}
                           className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
@@ -665,7 +663,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                     {backgroundsList.map((bg) => (
                       <div
                         key={bg.id}
-                        className="relative group cursor-pointer aspect-square rounded overflow-hidden border border-gray-200 hover:border-blue-400 hover:shadow-sm"
+                        className={`relative group cursor-pointer aspect-square rounded overflow-hidden border transition-colors ${
+                          selectedBackgroundImageUrl === bg.url
+                            ? "border-blue-500 ring-2 ring-blue-200"
+                            : "border-gray-200 hover:border-blue-400 hover:shadow-sm"
+                        }`}
                         onClick={() =>
                           onBackgroundImageSelect &&
                           onBackgroundImageSelect(bg.url)
@@ -676,6 +678,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                           alt="Background Thumbnail"
                           className="object-cover w-full h-full"
                         />
+                        {selectedBackgroundImageUrl === bg.url && (
+                          <span className="absolute left-1 top-1 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-semibold text-white shadow">
+                            選択中
+                          </span>
+                        )}
                         <button
                           onClick={async (e) => {
                             e.stopPropagation();

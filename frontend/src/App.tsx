@@ -579,7 +579,6 @@ function App() {
         settings: buildProjectSettings(),
       });
       setSavedCommandsJSON(JSON.stringify(commands));
-      await alert("プロジェクトを上書き保存しました");
     } catch (err) {
       console.error(err);
       await alert("保存に失敗しました");
@@ -3082,6 +3081,7 @@ function App() {
             onExport={handleExportSelected}
             onBackgroundImageUpload={handleBackgroundImageUpload}
             onBackgroundImageSelect={(url) => setBackgroundImage(url)}
+            selectedBackgroundImageUrl={backgroundImage}
             onClearBackgroundImage={handleClearBackgroundImage}
             backgroundsList={backgroundsList}
             onDeleteBackground={handleDeleteBackground}
