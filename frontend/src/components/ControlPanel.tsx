@@ -388,7 +388,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   }, [backgroundsList, selectedBackgroundImageUrl]);
 
   return (
-    <div className="w-full bg-white flex flex-col h-full font-sans z-20 overflow-hidden">
+    <div className="w-full min-w-0 bg-white flex flex-col h-full min-h-0 font-sans z-20 overflow-y-auto overflow-x-hidden">
       {/* Header */}
       <div className="h-12 px-4 border-b border-gray-200 bg-white flex justify-between items-center shrink-0">
         <h2 className="text-xs font-bold text-gray-500 tracking-wider uppercase">
@@ -433,7 +433,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 min-h-0 min-w-0 p-4">
         {/* Environment Settings Tab */}
         <div className={activeTab === "environment" ? "space-y-6" : "hidden"}>
           {/* Device Settings */}
@@ -1556,7 +1556,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         {/* End Action Settings Tab */}
 
       {/* Bottom Static Section: Playback & Export */}
-      <div className="p-3 border-t border-gray-200 bg-gray-50 shrink-0 space-y-2">
+      <div className="sticky bottom-0 z-10 p-3 border-t border-gray-200 bg-gray-50 shrink-0 space-y-2">
         <button
           onClick={onTogglePlay}
           className={`w-full flex items-center justify-center px-3 py-2 border border-transparent rounded shadow-sm text-xs font-medium text-white transition-colors ${
