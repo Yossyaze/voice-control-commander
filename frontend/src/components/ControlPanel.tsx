@@ -388,7 +388,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   }, [backgroundsList, selectedBackgroundImageUrl]);
 
   return (
-    <div className="w-full min-w-0 bg-white flex flex-col h-full min-h-0 font-sans z-20 overflow-y-auto overflow-x-hidden">
+    <div className="w-full min-w-0 bg-white flex flex-col h-full min-h-0 font-sans z-20 overflow-hidden">
       {/* Header */}
       <div className="h-12 px-4 border-b border-gray-200 bg-white flex justify-between items-center shrink-0">
         <h2 className="text-xs font-bold text-gray-500 tracking-wider uppercase">
@@ -433,9 +433,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         </button>
       </div>
 
-      <div className="flex-1 min-h-0 min-w-0 p-4">
+      <div className="flex-1 min-h-0 min-w-0 overflow-hidden px-4">
         {/* Environment Settings Tab */}
-        <div className={activeTab === "environment" ? "space-y-6" : "hidden"}>
+        <div className={activeTab === "environment" ? "h-full overflow-y-auto overflow-x-hidden space-y-6 px-2" : "hidden"}>
           {/* Device Settings */}
           <div className="space-y-3">
             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block">
@@ -940,11 +940,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         </div>{" "}
         {/* End Environment Settings Tab */}
         {/* Action Settings Tab */}
-        <div className={activeTab === "action" ? "space-y-6" : "hidden"}>
+        <div className={activeTab === "action" ? "h-full overflow-y-auto overflow-x-hidden space-y-6 px-2" : "hidden"}>
           {/* Selected Item Properties (Contextual) */}
           {(!selectionType || selectionType === "stroke") && (
             <div
-              className={`space-y-4 pt-4 border-t border-gray-100 ${!isActionSelected ? "opacity-50 pointer-events-none grayscale" : ""}`}
+              className={`space-y-4 ${!isActionSelected ? "opacity-50 pointer-events-none grayscale" : ""}`}
             >
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
@@ -1457,7 +1457,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             )}
 
           {selectionType === "wait" && (
-            <div className="space-y-4 pt-4 border-t border-gray-100">
+            <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
                   待機設定
