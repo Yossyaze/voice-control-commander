@@ -204,7 +204,7 @@ const SortableStrokeItem = React.memo(
           </div>
           <span className={`font-medium ${isSelected ? 'text-blue-900' : 'text-gray-700'}`}>{index + 1}</span>
           <span className="ml-2 text-[10px] text-gray-500 tracking-wider">
-             {isTap(stroke) ? `${(tapDuration || 0.05).toFixed(2)}s` : "-"}
+             {isTap(stroke) ? `${(tapDuration || 0.05).toFixed(2)}s` : `${Math.max(0.01, stroke.length / 60).toFixed(2)}s`}
           </span>
         </div>
         {/* Delete Stroke Button */}
@@ -654,6 +654,7 @@ const SortableCommandItem = React.memo(
                           <span
                             className={`text-[10px] ml-1.5 tracking-wider ${selectedStrokeIndex === index - 1 && selectionType === "wait" ? "text-blue-700 font-bold" : "text-gray-500"}`}
                           >
+                            待機{" "}
                             {command.strokeMetadata?.[index - 1]?.waitAfter ??
                               command.waitDuration ??
                               0.1}s
