@@ -199,7 +199,11 @@ const SortableStrokeItem = React.memo(
             </div>
           </div>
 
-          <div className={`mr-2 flex items-center justify-center w-5 h-5 rounded ${isSelected ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'} text-xs`}>
+          <div className={`mr-2 flex items-center justify-center w-5 h-5 rounded text-xs ${
+            isTap(stroke)
+              ? isSelected ? 'bg-purple-200 text-purple-700' : 'bg-purple-50 text-purple-500'
+              : isSelected ? 'bg-blue-200 text-blue-700' : 'bg-blue-50 text-blue-500'
+          }`}>
             {isTap(stroke) ? <MousePointerClick className="w-3.5 h-3.5" /> : <Spline className="w-3.5 h-3.5" />}
           </div>
           <span className={`font-medium ${isSelected ? 'text-blue-900' : 'text-gray-700'}`}>{index + 1}</span>
