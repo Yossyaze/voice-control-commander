@@ -26,6 +26,10 @@ interface SidebarProps {
   onToggleVisibility: (id: string) => void;
   onFileUpload: (file: File) => void;
   onCreateNew: () => void;
+  onCopyCommand: () => void;
+  onPasteCommand: () => void;
+  canCopyCommand: boolean;
+  canPasteCommand: boolean;
   onRenameCommand: (id: string, newName: string) => void;
   onUpdateCommand: (cmd: Command) => void;
   selectedStrokeIndex: number | null;
@@ -53,6 +57,10 @@ interface SidebarProps {
   onToggleSelectStroke?: (index: number) => void;
   onGroupStrokes?: () => void;
   onUngroupStrokes?: () => void;
+  onCopyAction?: () => void;
+  onPasteAction?: () => void;
+  canCopyAction?: boolean;
+  canPasteAction?: boolean;
 
   // Project Management
   currentProjectId: string | null;
@@ -190,12 +198,12 @@ const SortableStrokeItem = React.memo(
             </div>
           </div>
 
-          <div
-            className={`w-2 h-2 rounded-full mr-2.5 shrink-0 ${isSelected ? "bg-blue-500 ring-2 ring-blue-200" : "bg-gray-400"}`}
-          ></div>
-          <span>アクション {index + 1}</span>
-          <span className="ml-2 text-[9px] uppercase tracking-wider text-gray-400 bg-white px-1 rounded border border-gray-100 shrink-0">
-            {isTap(stroke) ? `タップ (${(tapDuration || 0.05).toFixed(2)}s)` : "パス"}
+          <div className={`mr-2 flex items-center justify-center w-5 h-5 rounded ${isSelected ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'} text-xs`}>
+            {isTap(stroke) ? "👆" : "〰️"}
+          </div>
+          <span className={`font-medium ${isSelected ? 'text-blue-900' : 'text-gray-700'}`}>{index + 1}</span>
+          <span className="ml-2 text-[10px] text-gray-500 tracking-wider">
+             {isTap(stroke) ? `${(tapDuration || 0.05).toFixed(2)}s` : "-"}
           </span>
         </div>
         {/* Delete Stroke Button */}
@@ -332,6 +340,10 @@ interface SortableCommandItemProps {
   onToggleSelectStroke?: (index: number) => void;
   onGroupStrokes?: () => void;
   onUngroupStrokes?: () => void;
+  onCopyAction?: () => void;
+  onPasteAction?: () => void;
+  canCopyAction?: boolean;
+  canPasteAction?: boolean;
 }
 
 const SortableCommandItem = React.memo(
@@ -357,6 +369,10 @@ const SortableCommandItem = React.memo(
     onToggleSelectStroke,
     onGroupStrokes,
     onUngroupStrokes,
+    onCopyAction,
+    onPasteAction,
+    canCopyAction,
+    canPasteAction,
   }: SortableCommandItemProps) => {
     const {
       attributes,
@@ -623,7 +639,7 @@ const SortableCommandItem = React.memo(
                       {/* グループ化されているストローク間は待機時間を表示しない */}
                       {index > 0 && !isGroupedWithPrev && (
                         <div
-                          className={`flex items-center justify-center py-1 cursor-pointer group/wait relative my-1 rounded
+                          className={`flex items-center justify-center py-0.5 cursor-pointer group/wait relative my-0.5 rounded
                                                   ${selectedStrokeIndex === index - 1 && selectionType === "wait" ? "bg-blue-50 opacity-100 ring-1 ring-blue-200" : "opacity-60 hover:opacity-100 hover:bg-gray-50"}`}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -631,17 +647,15 @@ const SortableCommandItem = React.memo(
                             onSelectType?.("wait");
                           }}
                         >
-                          <div
-                            className={`h-3 w-0.5 rounded-full ${selectedStrokeIndex === index - 1 && selectionType === "wait" ? "bg-blue-500" : "bg-gray-300"}`}
-                          ></div>
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                          </svg>
                           <span
-                            className={`text-[10px] ml-2 ${selectedStrokeIndex === index - 1 && selectionType === "wait" ? "text-blue-700 font-bold" : "text-gray-500"}`}
+                            className={`text-[10px] ml-1.5 tracking-wider ${selectedStrokeIndex === index - 1 && selectionType === "wait" ? "text-blue-700 font-bold" : "text-gray-500"}`}
                           >
-                            待機{" "}
                             {command.strokeMetadata?.[index - 1]?.waitAfter ??
                               command.waitDuration ??
-                              0.1}
-                            秒
+                              0.1}s
                           </span>
                         </div>
                       )}
@@ -712,6 +726,66 @@ const SortableCommandItem = React.memo(
                 </button>
               </div>
             )}
+
+            {/* Action Clipboard Buttons */}
+            <div className="pt-2 pb-1 flex justify-center space-x-1 border-t border-dashed border-gray-200 mt-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCopyAction?.();
+                }}
+                disabled={!canCopyAction}
+                className={`p-1.5 rounded transition-colors ${
+                  canCopyAction
+                    ? "text-emerald-600 hover:bg-emerald-100"
+                    : "text-gray-300 cursor-not-allowed"
+                }`}
+                title="選択中のアクションをコピー"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                  />
+                </svg>
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPasteAction?.();
+                }}
+                disabled={!canPasteAction}
+                className={`p-1.5 rounded transition-colors ${
+                  canPasteAction
+                    ? "text-teal-600 hover:bg-teal-100"
+                    : "text-gray-300 cursor-not-allowed"
+                }`}
+                title="コピーしたアクションを貼り付け"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 6h.01M12 13h.01M12 17h.01"
+                  />
+                </svg>
+              </button>
+            </div>
 
             {/* Add Action Buttons */}
             <div className="pt-3 pb-1 flex justify-center space-x-2 border-t border-dashed border-gray-200 mt-2">
@@ -805,6 +879,10 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
     onToggleVisibility,
     onFileUpload,
     onCreateNew,
+    onCopyCommand,
+    onPasteCommand,
+    canCopyCommand,
+    canPasteCommand,
     onRenameCommand,
     onUpdateCommand,
     selectedStrokeIndex,
@@ -824,6 +902,10 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
     onToggleSelectStroke,
     onGroupStrokes,
     onUngroupStrokes,
+    onCopyAction,
+    onPasteAction,
+    canCopyAction,
+    canPasteAction,
     currentProjectId,
     projectsList,
     onLoadProject,
@@ -1053,6 +1135,56 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
               />
             </svg>
           </button>
+          <button
+            onClick={onCopyCommand}
+            disabled={!canCopyCommand}
+            className={`p-1.5 rounded transition-colors ${
+              canCopyCommand
+                ? "text-emerald-600 hover:bg-emerald-100"
+                : "text-gray-300 cursor-not-allowed"
+            }`}
+            title="選択中のコマンドをコピー"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+              />
+            </svg>
+          </button>
+          <button
+            onClick={onPasteCommand}
+            disabled={!canPasteCommand}
+            className={`p-1.5 rounded transition-colors ${
+              canPasteCommand
+                ? "text-teal-600 hover:bg-teal-100"
+                : "text-gray-300 cursor-not-allowed"
+            }`}
+            title="コピーしたコマンドを貼り付け"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 6h.01M12 13h.01M12 17h.01"
+              />
+            </svg>
+          </button>
         </div>
       </div>
       {/* Batch Actions Toolbar */}
@@ -1194,6 +1326,14 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                     onToggleSelectStroke={onToggleSelectStroke}
                     onGroupStrokes={onGroupStrokes}
                     onUngroupStrokes={onUngroupStrokes}
+                    onCopyAction={onCopyAction}
+                    onPasteAction={onPasteAction}
+                    canCopyAction={
+                      cmd.id === activeCommandId && Boolean(canCopyAction)
+                    }
+                    canPasteAction={
+                      cmd.id === activeCommandId && Boolean(canPasteAction)
+                    }
                   />
                 ))}
               </ul>
