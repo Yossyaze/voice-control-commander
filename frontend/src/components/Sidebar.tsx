@@ -135,7 +135,9 @@ const SortableStrokeItem = React.memo(
         className={`flex items-center justify-between text-xs px-2 py-2 cursor-pointer transition-colors border
                 ${
                   isSelected
-                    ? "bg-blue-50 border-blue-300 text-blue-900 shadow-sm font-semibold"
+                    ? isTap(stroke)
+                      ? "bg-purple-50 border-purple-300 text-purple-900 shadow-sm font-semibold"
+                      : "bg-blue-50 border-blue-300 text-blue-900 shadow-sm font-semibold"
                     : groupId
                       ? "bg-indigo-50/50 border-indigo-200 text-gray-800 hover:bg-indigo-100"
                       : "bg-gray-50 border-transparent text-gray-700 hover:bg-gray-100 hover:border-gray-200"
@@ -206,7 +208,7 @@ const SortableStrokeItem = React.memo(
           }`}>
             {isTap(stroke) ? <MousePointerClick className="w-3.5 h-3.5" /> : <Spline className="w-3.5 h-3.5" />}
           </div>
-          <span className={`font-medium ${isSelected ? 'text-blue-900' : 'text-gray-700'}`}>{index + 1}</span>
+          <span className="font-medium">{index + 1}</span>
           <span className="ml-2 text-[10px] text-gray-500 tracking-wider">
              {isTap(stroke) ? `${(tapDuration || 0.05).toFixed(2)}s` : `${Math.max(0.01, (stroke.length - 1) / 60).toFixed(2)}s`}
           </span>
@@ -217,7 +219,7 @@ const SortableStrokeItem = React.memo(
             e.stopPropagation();
             onDelete();
           }}
-          className={`p-1 hover:text-red-500 hover:bg-red-100 rounded transition-colors ml-2 ${isSelected ? "text-blue-400" : "text-gray-400"}`}
+          className={`p-1 hover:text-red-500 hover:bg-red-100 rounded transition-colors ml-2 ${isSelected ? (isTap(stroke) ? "text-purple-400" : "text-blue-400") : "text-gray-400"}`}
           title="アクションを削除"
         >
           <svg
