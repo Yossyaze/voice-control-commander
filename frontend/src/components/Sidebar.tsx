@@ -1,4 +1,5 @@
 import React from "react";
+import { MousePointerClick, Spline } from "lucide-react";
 import {
   DndContext,
   closestCenter,
@@ -199,7 +200,7 @@ const SortableStrokeItem = React.memo(
           </div>
 
           <div className={`mr-2 flex items-center justify-center w-5 h-5 rounded ${isSelected ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'} text-xs`}>
-            {isTap(stroke) ? "👆" : "〰️"}
+            {isTap(stroke) ? <MousePointerClick className="w-3.5 h-3.5" /> : <Spline className="w-3.5 h-3.5" />}
           </div>
           <span className={`font-medium ${isSelected ? 'text-blue-900' : 'text-gray-700'}`}>{index + 1}</span>
           <span className="ml-2 text-[10px] text-gray-500 tracking-wider">
