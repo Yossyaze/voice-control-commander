@@ -204,7 +204,7 @@ const SortableStrokeItem = React.memo(
           </div>
           <span className={`font-medium ${isSelected ? 'text-blue-900' : 'text-gray-700'}`}>{index + 1}</span>
           <span className="ml-2 text-[10px] text-gray-500 tracking-wider">
-             {isTap(stroke) ? `${(tapDuration || 0.05).toFixed(2)}s` : `${Math.max(0.01, stroke.length / 60).toFixed(2)}s`}
+             {isTap(stroke) ? `${(tapDuration || 0.05).toFixed(2)}s` : `${Math.max(0.01, (stroke.length - 1) / 60).toFixed(2)}s`}
           </span>
         </div>
         {/* Delete Stroke Button */}
