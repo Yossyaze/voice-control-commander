@@ -1556,7 +1556,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         {/* End Action Settings Tab */}
 
       {/* Bottom Static Section: Playback & Export */}
-      <div className="sticky bottom-0 z-10 p-3 border-t border-gray-200 bg-gray-50 shrink-0 space-y-2">
+      <div className="p-3 border-t border-gray-200 bg-gray-50 shrink-0 space-y-2">
         <button
           onClick={onTogglePlay}
           className={`w-full flex items-center justify-center px-3 py-2 border border-transparent rounded shadow-sm text-xs font-medium text-white transition-colors ${

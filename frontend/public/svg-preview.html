@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SVG Icons Preview</title>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; background-color: #f9fafb; color: #111827; }
+    .container { max-width: 600px; margin: 0 auto; background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    h2 { margin-top: 2rem; border-bottom: 2px solid #e5e7eb; padding-bottom: 0.5rem; }
+    .icon-row { display: flex; align-items: center; gap: 2rem; margin-top: 1rem; }
+    .icon-box { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+    .icon { width: 48px; height: 48px; color: #4b5563; }
+    .label { font-size: 0.875rem; color: #6b7280; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>SVGアイコンプレビュー</h1>
+    
+    <h2>案A：直感的な「指」と「波線」</h2>
+    <div class="icon-row">
+      <div class="icon-box">
+        <!-- 指のアイコン -->
+        <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2v6" />
+          <path d="M12 22a8 8 0 0 0 8-8v-3a2 2 0 0 0-4 0v1a2 2 0 0 0-4 0v-5a2 2 0 0 0-4 0v8a2 2 0 0 0-4 0v-2a2 2 0 0 0-4 0v6a8 8 0 0 0 8 8z" />
+        </svg>
+        <div class="label">タップ (点)</div>
+      </div>
+      <div class="icon-box">
+        <!-- 波線のアイコン -->
+        <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 12c2.5-3.5 5.5-3.5 8 0s5.5 3.5 8 0" />
+          <path d="M17 9l3 3-3 3" /> 
+        </svg>
+        <div class="label">スワイプ (パス)</div>
+      </div>
+    </div>
+
+    <h2>案B：ミニマルな「点」と「矢印」</h2>
+    <div class="icon-row">
+      <div class="icon-box">
+        <!-- 的のアイコン -->
+        <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+        <div class="label">タップ (点)</div>
+      </div>
+      <div class="icon-box">
+        <!-- パス・矢印のアイコン -->
+        <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M7 17L17 7" />
+          <path d="M11 7h6v6" />
+          <circle cx="7" cy="17" r="2" />
+        </svg>
+        <div class="label">ドラッグ (線)</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

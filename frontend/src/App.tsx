@@ -35,6 +35,11 @@ interface DeviceModel {
   category: "iPhone" | "iPad";
 }
 
+interface ActionClipboard {
+  stroke: Point[];
+  metadata?: { waitAfter?: number; tapDuration?: number };
+}
+
 const revokeBackgroundUrls = (backgrounds: BackgroundImage[]) => {
   backgrounds.forEach((bg) => URL.revokeObjectURL(bg.url));
 };
@@ -717,6 +722,12 @@ function App() {
   const [selectionType, setSelectionType] = useState<"stroke" | "wait">(
     "stroke",
   );
+  const [commandClipboard, setCommandClipboard] = useState<Command | null>(
+    null,
+  );
+  const [actionClipboard, setActionClipboard] = useState<ActionClipboard | null>(
+    null,
+  );
 
   useEffect(() => {
     setCheckedStrokeIndices(new Set());
@@ -1217,19 +1228,10 @@ function App() {
     // setCheckedCommandIds(new Set([newId]));
   };
 
-  const handleDuplicateCommand = (id: string) => {
-    const cmdToCopy = commands.find((c) => c.id === id);
-    if (!cmdToCopy) return;
-
-    saveToHistory();
-
-    // macOSスタイル (連番) の命名ロジック
-    const originalName = cmdToCopy.name;
-    let nextName = "";
-    
-    // 末尾の「 数字」パターンを抽出 (例: "コマンド 2" -> "2")
-    const match = originalName.match(/(.+)\s(\d+)$/);
-    let baseName = originalName;
+  const getNextCommandName = (sourceName: string, current: Command[]) => {
+    const trimmed = sourceName.trim() || "新規コマンド";
+    const match = trimmed.match(/(.+)\s(\d+)$/);
+    let baseName = trimmed;
     let nextNumber = 2;
 
     if (match) {
@@ -1237,22 +1239,33 @@ function App() {
       nextNumber = parseInt(match[2], 10) + 1;
     }
 
-    // 重複しない名前が見つかるまでインクリメント
+    let nextName = "";
     while (true) {
       nextName = `${baseName} ${nextNumber}`;
-      if (!commands.some((c) => c.name === nextName)) {
-        break;
+      if (!current.some((c) => c.name === nextName)) {
+        return nextName;
       }
       nextNumber++;
     }
+  };
 
-    const newId = crypto.randomUUID();
-    const duplicatedCommand: Command = {
-      ...JSON.parse(JSON.stringify(cmdToCopy)), // deep copy
-      id: newId,
-      name: nextName,
-      color: getNextColor(commands),
+  const createPastedCommand = (source: Command, current: Command[]) => {
+    const cloned: Command = JSON.parse(JSON.stringify(source));
+    return {
+      ...cloned,
+      id: crypto.randomUUID(),
+      name: getNextCommandName(source.name, current),
+      color: getNextColor(current),
     };
+  };
+
+  const handleDuplicateCommand = (id: string) => {
+    const cmdToCopy = commands.find((c) => c.id === id);
+    if (!cmdToCopy) return;
+
+    saveToHistory();
+    const duplicatedCommand = createPastedCommand(cmdToCopy, commands);
+    const newId = duplicatedCommand.id;
 
     setCommands((prev) => {
       const index = prev.findIndex((c) => c.id === id);
@@ -1265,6 +1278,111 @@ function App() {
     setActiveCommandId(newId);
     setSelectedStrokeIndex(0);
     setSelectionType("stroke");
+  };
+
+  const handleCopyCommand = () => {
+    if (!activeCommandId) return;
+    const target = commands.find((c) => c.id === activeCommandId);
+    if (!target) return;
+    setCommandClipboard(JSON.parse(JSON.stringify(target)));
+  };
+
+  const handlePasteCommand = () => {
+    if (!commandClipboard) return;
+
+    saveToHistory();
+    const insertedCommand = createPastedCommand(commandClipboard, commands);
+
+    setCommands((prev) => {
+      const insertAfterIndex = activeCommandId
+        ? prev.findIndex((c) => c.id === activeCommandId)
+        : -1;
+      const next = [...prev];
+      if (insertAfterIndex === -1) {
+        next.push(insertedCommand);
+      } else {
+        next.splice(insertAfterIndex + 1, 0, insertedCommand);
+      }
+      return next;
+    });
+
+    setActiveCommandId(insertedCommand.id);
+    setSelectedStrokeIndex(
+      insertedCommand.strokes && insertedCommand.strokes.length > 0 ? 0 : null,
+    );
+    setSelectionType("stroke");
+  };
+
+  const handleCopyAction = () => {
+    if (!selectedCommand || selectedStrokeIndex === null) return;
+    if (selectedStrokeIndex < 0 || selectedStrokeIndex >= selectedCommand.strokes.length)
+      return;
+
+    const sourceStroke = selectedCommand.strokes[selectedStrokeIndex];
+    const sourceMetadata = selectedCommand.strokeMetadata?.[selectedStrokeIndex];
+    setActionClipboard({
+      stroke: JSON.parse(JSON.stringify(sourceStroke)),
+      metadata: sourceMetadata
+        ? {
+            waitAfter: sourceMetadata.waitAfter,
+            tapDuration: sourceMetadata.tapDuration,
+          }
+        : undefined,
+    });
+  };
+
+  const handlePasteAction = () => {
+    if (!activeCommandId || !actionClipboard) return;
+
+    saveToHistory();
+
+    let insertedStrokeIndex: number | null = null;
+    setCommands((prev) =>
+      prev.map((cmd) => {
+        if (cmd.id !== activeCommandId) return cmd;
+
+        const insertIndex =
+          selectedStrokeIndex !== null &&
+          selectedStrokeIndex >= 0 &&
+          selectedStrokeIndex < cmd.strokes.length
+            ? selectedStrokeIndex + 1
+            : cmd.strokes.length;
+        insertedStrokeIndex = insertIndex;
+
+        const pastedStroke: Point[] = actionClipboard.stroke.map((p) => ({
+          x: p.x,
+          y: p.y,
+        }));
+        const newStrokes = [...cmd.strokes];
+        newStrokes.splice(insertIndex, 0, pastedStroke);
+
+        const shouldKeepMetadata = Boolean(cmd.strokeMetadata) || Boolean(actionClipboard.metadata);
+        let newMetadata = cmd.strokeMetadata;
+        if (shouldKeepMetadata) {
+          const metadata = cmd.strokeMetadata ? [...cmd.strokeMetadata] : [];
+          while (metadata.length < cmd.strokes.length) {
+            metadata.push({});
+          }
+          metadata.splice(insertIndex, 0, {
+            waitAfter: actionClipboard.metadata?.waitAfter,
+            tapDuration: actionClipboard.metadata?.tapDuration,
+          });
+          newMetadata = metadata;
+        }
+
+        return {
+          ...cmd,
+          strokes: newStrokes,
+          strokeMetadata: newMetadata,
+          points: newStrokes[0] || [],
+        };
+      }),
+    );
+
+    if (insertedStrokeIndex !== null) {
+      setSelectedStrokeIndex(insertedStrokeIndex);
+      setSelectionType("stroke");
+    }
   };
 
   const handleFileUpload = async (file: File) => {
@@ -2781,6 +2899,10 @@ function App() {
           }}
           onFileUpload={handleFileUpload}
           onCreateNew={handleCreateNewCommand}
+          onCopyCommand={handleCopyCommand}
+          onPasteCommand={handlePasteCommand}
+          canCopyCommand={Boolean(activeCommandId)}
+          canPasteCommand={Boolean(commandClipboard)}
           onRenameCommand={(id, name) => {
             saveToHistory();
             setCommands((prev) =>
@@ -2805,6 +2927,15 @@ function App() {
           onToggleSelectStroke={handleToggleSelectStroke}
           onGroupStrokes={handleGroupStrokes}
           onUngroupStrokes={handleUngroupStrokes}
+          onCopyAction={handleCopyAction}
+          onPasteAction={handlePasteAction}
+          canCopyAction={
+            Boolean(selectedCommand) &&
+            selectedStrokeIndex !== null &&
+            selectedStrokeIndex >= 0 &&
+            selectedStrokeIndex < (selectedCommand?.strokes.length || 0)
+          }
+          canPasteAction={Boolean(selectedCommand) && Boolean(actionClipboard)}
           onBatchExport={handleBatchExport}
           onBatchDelete={handleBatchDelete}
           onSelectAll={handleSelectAllCommands}
