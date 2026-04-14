@@ -138,7 +138,7 @@ const SortableStrokeItem = React.memo(
       <div
         ref={setNodeRef}
         style={style}
-        className={`flex items-center justify-between text-xs px-2 py-2 cursor-pointer transition-colors border
+        className={`flex items-center justify-between text-xs px-1.5 py-1.5 cursor-pointer transition-colors border
                 ${
                   isSelected
                     ? isTap(stroke)
@@ -157,71 +157,73 @@ const SortableStrokeItem = React.memo(
           onSelect();
         }}
       >
-        <div
-          {...attributes}
-          {...listeners}
-          className="mr-2 cursor-move text-gray-300 hover:text-gray-500 touch-none shrink-0"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-3 w-3"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 8h16M4 16h16"
-            />
-          </svg>
-        </div>
-
-        <div
-          className="mr-2 shrink-0 cursor-pointer"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleMultiSelect?.(e);
-          }}
-        >
+        <div className="flex items-center gap-1.5 flex-1 min-w-0 pr-1">
           <div
-            className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center transition-colors ${isMultiSelected ? "bg-blue-500 border-blue-500" : "bg-white border-gray-300 hover:border-blue-400"}`}
+            {...attributes}
+            {...listeners}
+            className="cursor-move text-gray-300 hover:text-gray-500 touch-none shrink-0"
+            onClick={(e) => e.stopPropagation()}
           >
-            {isMultiSelected && (
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-2.5 w-2.5 text-white"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            )}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-3 w-3"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 8h16M4 16h16"
+              />
+            </svg>
           </div>
-        </div>
 
-        <span className="mr-2 font-medium min-w-[1ch] text-right shrink-0">{index + 1}</span>
-        
-        <div className={`mr-2 flex items-center justify-center w-5 h-5 shrink-0 rounded text-xs ${
-          isTap(stroke)
-            ? isSelected ? 'bg-purple-200 text-purple-700' : 'bg-purple-50 text-purple-500'
-            : isSelected ? 'bg-blue-200 text-blue-700' : 'bg-blue-50 text-blue-500'
-        }`}>
-          {isTap(stroke) ? <MousePointerClick className="w-3.5 h-3.5" /> : <Spline className="w-3.5 h-3.5" />}
+          <div
+            className="shrink-0 cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleMultiSelect?.(e);
+            }}
+          >
+            <div
+              className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center transition-colors ${isMultiSelected ? "bg-blue-500 border-blue-500" : "bg-white border-gray-300 hover:border-blue-400"}`}
+            >
+              {isMultiSelected && (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-2.5 w-2.5 text-white"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              )}
+            </div>
+          </div>
+
+          <span className="font-medium min-w-[1ch] text-right shrink-0">{index + 1}</span>
+          
+          <div className={`flex items-center justify-center w-5 h-5 shrink-0 rounded text-xs ${
+            isTap(stroke)
+              ? isSelected ? 'bg-purple-200 text-purple-700' : 'bg-purple-50 text-purple-500'
+              : isSelected ? 'bg-blue-200 text-blue-700' : 'bg-blue-50 text-blue-500'
+          }`}>
+            {isTap(stroke) ? <MousePointerClick className="w-3.5 h-3.5" /> : <Spline className="w-3.5 h-3.5" />}
+          </div>
+          
+          <span className="text-[10px] text-gray-500 tracking-wider shrink-0 min-w-0 pr-1 truncate">
+             {isTap(stroke) ? `${(tapDuration || 0.05).toFixed(2)}s` : `${Math.max(0.01, (stroke.length - 1) / 60).toFixed(2)}s`}
+          </span>
         </div>
-        
-        <span className="mr-auto text-[10px] text-gray-500 tracking-wider shrink-0 min-w-10">
-           {isTap(stroke) ? `${(tapDuration || 0.05).toFixed(2)}s` : `${Math.max(0.01, (stroke.length - 1) / 60).toFixed(2)}s`}
-        </span>
 
         {/* Buttons Container */}
-        <div className="flex items-center gap-x-0.5 shrink-0 ml-1">
+        <div className="flex items-center gap-x-0.5 shrink-0">
           {/* Copy Button */}
           {onCopy && (
             <button
