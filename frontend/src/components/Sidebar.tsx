@@ -538,16 +538,41 @@ const SortableCommandItem = React.memo(
                 onCommit={(newName) => onFinishEditing(command.id, newName)}
               />
             ) : (
-              <span
-                className={`text-sm font-bold truncate flex-1 ${isSelected ? "text-blue-900" : "text-gray-800"}`}
-                onDoubleClick={(e) => {
-                  e.stopPropagation();
-                  onStartEditing(command.id, command.name);
-                }}
-                title={command.name}
-              >
-                {command.name}
-              </span>
+              <div className="flex items-center flex-1 min-w-0">
+                <span
+                  className={`text-sm font-bold truncate flex-1 ${isSelected ? "text-blue-900" : "text-gray-800"}`}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    onStartEditing(command.id, command.name);
+                  }}
+                  title={command.name}
+                >
+                  {command.name}
+                </span>
+                {/* Rename Button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onStartEditing(command.id, command.name);
+                  }}
+                  className="p-1 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-colors opacity-0 group-hover/item:opacity-100 shrink-0 ml-1"
+                  title="コマンド名を変更"
+                >
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                    />
+                  </svg>
+                </button>
+              </div>
             )}
           </div>
 
@@ -602,31 +627,6 @@ const SortableCommandItem = React.memo(
             </div>
 
             <div className="flex items-center space-x-1">
-              {/* Rename Button */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onStartEditing(command.id, command.name);
-                }}
-                className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded p-1 transition-colors"
-                title="コマンド名を変更"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-                  />
-                </svg>
-              </button>
-
               {/* Duplicate Button */}
               <button
                 onClick={(e) => {
