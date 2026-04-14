@@ -602,6 +602,31 @@ const SortableCommandItem = React.memo(
             </div>
 
             <div className="flex items-center space-x-1">
+              {/* Rename Button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onStartEditing(command.id, command.name);
+                }}
+                className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded p-1 transition-colors"
+                title="コマンド名を変更"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                  />
+                </svg>
+              </button>
+
               {/* Duplicate Button */}
               <button
                 onClick={(e) => {
@@ -795,7 +820,7 @@ const SortableCommandItem = React.memo(
 
 
             {/* Add Action Buttons */}
-            <div className="pt-3 pb-1 flex justify-center space-x-2 border-t border-dashed border-gray-200 mt-2">
+            <div className="pt-3 pb-1 flex justify-center gap-1.5 border-t border-dashed border-gray-200 mt-2">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -808,10 +833,10 @@ const SortableCommandItem = React.memo(
                     strokes: [...command.strokes, newStroke],
                   });
                 }}
-                className="flex-1 px-2 py-1.5 text-[10px] font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded flex items-center justify-center transition-colors shadow-sm"
+                className="flex-1 px-1.5 py-1.5 text-[10px] font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded flex items-center justify-center transition-colors shadow-sm whitespace-nowrap"
               >
-                <Spline className="h-3.5 w-3.5 mr-1.5" />
-                + 線を描く
+                <Spline className="h-3.5 w-3.5 mr-1 shrink-0" />
+                線を描く
               </button>
               <button
                 onClick={(e) => {
@@ -823,10 +848,10 @@ const SortableCommandItem = React.memo(
                     strokes: [...command.strokes, newTap],
                   });
                 }}
-                className="flex-1 px-2 py-1.5 text-[10px] font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded flex items-center justify-center transition-colors shadow-sm"
+                className="flex-1 px-1.5 py-1.5 text-[10px] font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded flex items-center justify-center transition-colors shadow-sm whitespace-nowrap"
               >
-                <MousePointerClick className="h-3.5 w-3.5 mr-1.5" />
-                + タップ
+                <MousePointerClick className="h-3.5 w-3.5 mr-1 shrink-0" />
+                タップ
               </button>
               {/* ペーストボタン */}
               <button
@@ -835,18 +860,18 @@ const SortableCommandItem = React.memo(
                   onPasteAction?.();
                 }}
                 disabled={!canPasteAction}
-                className={`flex-1 px-2 py-1.5 text-[10px] font-medium rounded flex items-center justify-center transition-colors shadow-sm border ${
+                className={`flex-1 px-1.5 py-1.5 text-[10px] font-medium rounded flex items-center justify-center transition-colors shadow-sm border whitespace-nowrap ${
                   canPasteAction
                     ? "text-teal-700 bg-teal-50 hover:bg-teal-100 border-teal-200"
                     : "text-gray-400 bg-gray-50 border-gray-200 cursor-not-allowed"
                 }`}
                 title="コピーしたアクションを末尾に貼り付け"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 11v5m-2.5-2.5h5" />
                 </svg>
-                + ペースト
+                ペースト
               </button>
             </div>
           </div>
