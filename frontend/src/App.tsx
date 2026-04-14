@@ -1313,13 +1313,14 @@ function App() {
     setSelectionType("stroke");
   };
 
-  const handleCopyAction = () => {
-    if (!selectedCommand || selectedStrokeIndex === null) return;
-    if (selectedStrokeIndex < 0 || selectedStrokeIndex >= selectedCommand.strokes.length)
+  const handleCopyAction = (index?: number) => {
+    const targetIndex = index !== undefined ? index : selectedStrokeIndex;
+    if (!selectedCommand || targetIndex === null) return;
+    if (targetIndex < 0 || targetIndex >= selectedCommand.strokes.length)
       return;
 
-    const sourceStroke = selectedCommand.strokes[selectedStrokeIndex];
-    const sourceMetadata = selectedCommand.strokeMetadata?.[selectedStrokeIndex];
+    const sourceStroke = selectedCommand.strokes[targetIndex];
+    const sourceMetadata = selectedCommand.strokeMetadata?.[targetIndex];
     setActionClipboard({
       stroke: JSON.parse(JSON.stringify(sourceStroke)),
       metadata: sourceMetadata
@@ -1331,7 +1332,7 @@ function App() {
     });
   };
 
-  const handlePasteAction = () => {
+  const handlePasteAction = (index?: number) => {
     if (!activeCommandId || !actionClipboard) return;
 
     saveToHistory();
@@ -1342,11 +1343,13 @@ function App() {
         if (cmd.id !== activeCommandId) return cmd;
 
         const insertIndex =
-          selectedStrokeIndex !== null &&
-          selectedStrokeIndex >= 0 &&
-          selectedStrokeIndex < cmd.strokes.length
-            ? selectedStrokeIndex + 1
-            : cmd.strokes.length;
+          index !== undefined
+            ? index + 1
+            : selectedStrokeIndex !== null &&
+              selectedStrokeIndex >= 0 &&
+              selectedStrokeIndex < cmd.strokes.length
+              ? selectedStrokeIndex + 1
+              : cmd.strokes.length;
         insertedStrokeIndex = insertIndex;
 
         const pastedStroke: Point[] = actionClipboard.stroke.map((p) => ({
