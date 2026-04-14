@@ -292,6 +292,7 @@ const SortableStrokeItem = React.memo(
       prevProps.isGroupedWithPrev === nextProps.isGroupedWithPrev &&
       prevProps.isGroupedWithNext === nextProps.isGroupedWithNext &&
       prevProps.tapDuration === nextProps.tapDuration &&
+      prevProps.canPaste === nextProps.canPaste &&
       prevProps.stroke.length === nextProps.stroke.length &&
       prevProps.stroke === nextProps.stroke
     );
@@ -727,6 +728,9 @@ const SortableCommandItem = React.memo(
                           command.tapDuration ?? 
                           0.05
                         }
+                        onCopy={() => onCopyAction?.(index)}
+                        onPaste={() => onPasteAction?.(index)}
+                        canPaste={canPasteAction}
                         onSelect={() => {
                         onSelectStroke(index);
                         onSelectType?.("stroke");
