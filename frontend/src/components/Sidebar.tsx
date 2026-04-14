@@ -215,12 +215,12 @@ const SortableStrokeItem = React.memo(
           }`}>
             {isTap(stroke) ? <MousePointerClick className="w-3.5 h-3.5" /> : <Spline className="w-3.5 h-3.5" />}
           </div>
-          <span className="ml-2 text-[10px] text-gray-500 tracking-wider">
+          <span className="ml-2 text-[10px] text-gray-500 tracking-wider shrink-0 min-w-[2.5rem]">
              {isTap(stroke) ? `${(tapDuration || 0.05).toFixed(2)}s` : `${Math.max(0.01, (stroke.length - 1) / 60).toFixed(2)}s`}
           </span>
         </div>
         {/* Buttons Container */}
-        <div className="flex items-center space-x-1">
+        <div className="flex items-center space-x-1 shrink-0 ml-2">
           {/* Copy Button */}
           {onCopy && (
             <button
