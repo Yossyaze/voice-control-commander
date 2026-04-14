@@ -1280,9 +1280,10 @@ function App() {
     setSelectionType("stroke");
   };
 
-  const handleCopyCommand = () => {
-    if (!activeCommandId) return;
-    const target = commands.find((c) => c.id === activeCommandId);
+  const handleCopyCommand = (id?: string) => {
+    const targetId = id || activeCommandId;
+    if (!targetId) return;
+    const target = commands.find((c) => c.id === targetId);
     if (!target) return;
     setCommandClipboard(JSON.parse(JSON.stringify(target)));
   };

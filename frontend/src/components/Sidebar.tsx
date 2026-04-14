@@ -27,7 +27,7 @@ interface SidebarProps {
   onToggleVisibility: (id: string) => void;
   onFileUpload: (file: File) => void;
   onCreateNew: () => void;
-  onCopyCommand: () => void;
+  onCopyCommand: (id?: string) => void;
   onPasteCommand: () => void;
   canCopyCommand: boolean;
   canPasteCommand: boolean;
@@ -370,6 +370,7 @@ interface SortableCommandItemProps {
   onToggleVisibility: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
+  onCopy: () => void;
   onUpdateCommand: (cmd: Command) => void;
 
   // Props for Stroke Selection/Sorting inside
@@ -402,6 +403,7 @@ const SortableCommandItem = React.memo(
     onToggleVisibility,
     onDelete,
     onDuplicate,
+    onCopy,
     onUpdateCommand,
     selectedStrokeIndex,
     selectionType,
@@ -627,6 +629,31 @@ const SortableCommandItem = React.memo(
             </div>
 
             <div className="flex items-center space-x-1">
+              {/* Copy Button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCopy();
+                }}
+                className="text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded p-1 transition-colors"
+                title="コマンドをコピー"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                  />
+                </svg>
+              </button>
+
               {/* Duplicate Button */}
               <button
                 onClick={(e) => {
@@ -1161,7 +1188,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
             </svg>
           </button>
           <button
-            onClick={onCopyCommand}
+            onClick={() => onCopyCommand()}
             disabled={!canCopyCommand}
             className={`p-1.5 rounded transition-colors ${
               canCopyCommand
@@ -1335,6 +1362,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                     onToggleVisibility={() => onToggleVisibility(cmd.id)}
                     onDelete={() => onDeleteCommand(cmd.id)}
                     onDuplicate={() => onDuplicateCommand(cmd.id)}
+                    onCopy={() => onCopyCommand?.(cmd.id)}
                     onUpdateCommand={onUpdateCommand}
                     selectedStrokeIndex={selectedStrokeIndex}
                     selectionType={selectionType}
