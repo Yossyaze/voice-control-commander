@@ -92,8 +92,7 @@ interface SortableStrokeItemProps {
   isGroupedWithNext?: boolean;
   tapDuration?: number;
   onCopy?: () => void;
-  onPaste?: () => void;
-  canPaste?: boolean;
+  onDuplicate?: () => void;
 }
 
 // Helper to determine if tap
@@ -114,8 +113,7 @@ const SortableStrokeItem = React.memo(
     isGroupedWithNext,
     tapDuration,
     onCopy,
-    onPaste,
-    canPaste,
+    onDuplicate,
   }: SortableStrokeItemProps) => {
     const {
       attributes,
@@ -231,29 +229,25 @@ const SortableStrokeItem = React.memo(
                 onCopy();
               }}
               className="p-1 hover:text-emerald-500 hover:bg-emerald-100 rounded transition-colors text-gray-400"
-              title="このアクションを単独でコピー"
+              title="このアクションを別の場所にコピー"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
               </svg>
             </button>
           )}
-          {/* Paste Button */}
-          {onPaste && (
+          {/* Duplicate Button */}
+          {onDuplicate && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onPaste();
+                onDuplicate();
               }}
-              disabled={!canPaste}
-              className={`p-1 rounded transition-colors ${
-                canPaste ? "text-gray-400 hover:text-teal-500 hover:bg-teal-100" : "text-gray-200 cursor-not-allowed"
-              }`}
-              title="この行の【下】に新しくコピーを追加（上書きされません）"
+              className="p-1 rounded transition-colors text-gray-400 hover:text-teal-500 hover:bg-teal-100"
+              title="このアクションを複製して下に追加"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 11v5m-2.5-2.5h5" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
             </button>
           )}
@@ -295,7 +289,6 @@ const SortableStrokeItem = React.memo(
       prevProps.isGroupedWithPrev === nextProps.isGroupedWithPrev &&
       prevProps.isGroupedWithNext === nextProps.isGroupedWithNext &&
       prevProps.tapDuration === nextProps.tapDuration &&
-      prevProps.canPaste === nextProps.canPaste &&
       prevProps.stroke.length === nextProps.stroke.length &&
       prevProps.stroke === nextProps.stroke
     );
@@ -730,8 +723,25 @@ const SortableCommandItem = React.memo(
                           0.05
                         }
                         onCopy={() => onCopyAction?.(index)}
-                        onPaste={() => onPasteAction?.(index)}
-                        canPaste={canPasteAction}
+                        onDuplicate={() => {
+                          // このアクションを複製して直下に追加
+                          const duplicatedStroke = stroke.map(p => ({ x: p.x, y: p.y }));
+                          const newStrokes = [...command.strokes];
+                          newStrokes.splice(index + 1, 0, duplicatedStroke);
+                          // メタデータも複製
+                          let newMetadata = command.strokeMetadata;
+                          if (command.strokeMetadata) {
+                            const metadata = [...command.strokeMetadata];
+                            const srcMeta = metadata[index] || {};
+                            metadata.splice(index + 1, 0, { ...srcMeta });
+                            newMetadata = metadata;
+                          }
+                          onUpdateCommand({
+                            ...command,
+                            strokes: newStrokes,
+                            strokeMetadata: newMetadata,
+                          });
+                        }}
                         onSelect={() => {
                         onSelectStroke(index);
                         onSelectType?.("stroke");
@@ -789,7 +799,7 @@ const SortableCommandItem = React.memo(
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  // Default horizontal stroke
+                  // デフォルトの縦方向ストローク
                   const newStroke: Point[] = Array(24)
                     .fill(0)
                     .map((_, i) => ({ x: 100, y: 400 + i * 5 }));
@@ -806,7 +816,7 @@ const SortableCommandItem = React.memo(
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  // Tap point
+                  // タップポイント
                   const newTap: Point[] = [{ x: 160, y: 400 }];
                   onUpdateCommand({
                     ...command,
@@ -817,6 +827,26 @@ const SortableCommandItem = React.memo(
               >
                 <MousePointerClick className="h-3.5 w-3.5 mr-1.5" />
                 + タップ
+              </button>
+              {/* ペーストボタン */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPasteAction?.();
+                }}
+                disabled={!canPasteAction}
+                className={`flex-1 px-2 py-1.5 text-[10px] font-medium rounded flex items-center justify-center transition-colors shadow-sm border ${
+                  canPasteAction
+                    ? "text-teal-700 bg-teal-50 hover:bg-teal-100 border-teal-200"
+                    : "text-gray-400 bg-gray-50 border-gray-200 cursor-not-allowed"
+                }`}
+                title="コピーしたアクションを末尾に貼り付け"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 11v5m-2.5-2.5h5" />
+                </svg>
+                + ペースト
               </button>
             </div>
           </div>
