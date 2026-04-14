@@ -555,7 +555,7 @@ const SortableCommandItem = React.memo(
                     e.stopPropagation();
                     onStartEditing(command.id, command.name);
                   }}
-                  className="p-1 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-colors opacity-0 group-hover/item:opacity-100 shrink-0 ml-1"
+                  className="p-1 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-colors shrink-0 ml-1"
                   title="コマンド名を変更"
                 >
                   <svg
@@ -1053,8 +1053,8 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                 >
                   {p.name}
                 </span>
-                {/* 操作ボタン（ホバーで表示） */}
-                <div className="flex items-center space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-1">
+                {/* 操作ボタン（常に表示） */}
+                <div className="flex items-center space-x-0.5 transition-opacity shrink-0 ml-1">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
