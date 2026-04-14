@@ -620,7 +620,6 @@ const SortableCommandItem = React.memo(
                     <path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.064 7 9.542 7 .847 0 1.669-.105 2.454-.303z" />
                   </svg>
                 )}
-                <span className="text-[10px]">表示中</span>
               </button>
 
               <span className="text-[10px] text-gray-400 font-mono bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
