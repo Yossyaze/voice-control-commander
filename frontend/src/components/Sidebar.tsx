@@ -157,7 +157,7 @@ const SortableStrokeItem = React.memo(
           onSelect();
         }}
       >
-        <div className="flex items-center flex-1 min-w-0">
+        <div className="flex items-center flex-1 min-w-0 pr-2">
           <div
             {...attributes}
             {...listeners}
@@ -220,7 +220,7 @@ const SortableStrokeItem = React.memo(
           </span>
         </div>
         {/* Buttons Container */}
-        <div className="flex items-center space-x-1 shrink-0 ml-2">
+        <div className="flex items-center space-x-1 shrink-0">
           {/* Copy Button */}
           {onCopy && (
             <button
