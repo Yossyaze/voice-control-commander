@@ -2932,12 +2932,7 @@ function App() {
           onUngroupStrokes={handleUngroupStrokes}
           onCopyAction={handleCopyAction}
           onPasteAction={handlePasteAction}
-          canCopyAction={
-            Boolean(selectedCommand) &&
-            selectedStrokeIndex !== null &&
-            selectedStrokeIndex >= 0 &&
-            selectedStrokeIndex < (selectedCommand?.strokes.length || 0)
-          }
+
           canPasteAction={Boolean(selectedCommand) && Boolean(actionClipboard)}
           onBatchExport={handleBatchExport}
           onBatchDelete={handleBatchDelete}

@@ -60,7 +60,6 @@ interface SidebarProps {
   onUngroupStrokes?: () => void;
   onCopyAction?: (index?: number) => void;
   onPasteAction?: (index?: number) => void;
-  canCopyAction?: boolean;
   canPasteAction?: boolean;
 
   // Project Management
@@ -393,9 +392,8 @@ interface SortableCommandItemProps {
   onToggleSelectStroke?: (index: number) => void;
   onGroupStrokes?: () => void;
   onUngroupStrokes?: () => void;
-  onCopyAction?: () => void;
-  onPasteAction?: () => void;
-  canCopyAction?: boolean;
+  onCopyAction?: (index?: number) => void;
+  onPasteAction?: (index?: number) => void;
   canPasteAction?: boolean;
 }
 
@@ -424,7 +422,6 @@ const SortableCommandItem = React.memo(
     onUngroupStrokes,
     onCopyAction,
     onPasteAction,
-    canCopyAction,
     canPasteAction,
   }: SortableCommandItemProps) => {
     const {
@@ -784,65 +781,7 @@ const SortableCommandItem = React.memo(
               </div>
             )}
 
-            {/* Action Clipboard Buttons */}
-            <div className="pt-2 pb-1 flex justify-center space-x-1 border-t border-dashed border-gray-200 mt-2">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onCopyAction?.();
-                }}
-                disabled={!canCopyAction}
-                className={`p-1.5 rounded transition-colors ${
-                  canCopyAction
-                    ? "text-emerald-600 hover:bg-emerald-100"
-                    : "text-gray-300 cursor-not-allowed"
-                }`}
-                title="選択中のアクションをコピー"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
-                  />
-                </svg>
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onPasteAction?.();
-                }}
-                disabled={!canPasteAction}
-                className={`p-1.5 rounded transition-colors ${
-                  canPasteAction
-                    ? "text-teal-600 hover:bg-teal-100"
-                    : "text-gray-300 cursor-not-allowed"
-                }`}
-                title="コピーしたアクションを貼り付け"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 6h.01M12 13h.01M12 17h.01"
-                  />
-                </svg>
-              </button>
-            </div>
+
 
             {/* Add Action Buttons */}
             <div className="pt-3 pb-1 flex justify-center space-x-2 border-t border-dashed border-gray-200 mt-2">
@@ -935,7 +874,6 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
     onUngroupStrokes,
     onCopyAction,
     onPasteAction,
-    canCopyAction,
     canPasteAction,
     currentProjectId,
     projectsList,
@@ -1359,9 +1297,6 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                     onUngroupStrokes={onUngroupStrokes}
                     onCopyAction={onCopyAction}
                     onPasteAction={onPasteAction}
-                    canCopyAction={
-                      cmd.id === activeCommandId && Boolean(canCopyAction)
-                    }
                     canPasteAction={
                       cmd.id === activeCommandId && Boolean(canPasteAction)
                     }
