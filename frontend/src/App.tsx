@@ -996,6 +996,20 @@ function App() {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, []);
 
+  // ----------------------------------------------------------------------------
+  // Helpers for coordinate calculation
+  // ----------------------------------------------------------------------------
+  const getCurrentCenter = useCallback((): Point => {
+    const model = DEVICE_MODELS.find((m) => m.id === selectedModelId);
+    if (!model) return { x: 160, y: 400 };
+
+    // 向きを考慮
+    const w = orientation === "portrait" ? model.width : model.height;
+    const h = orientation === "portrait" ? model.height : model.width;
+
+    return { x: Math.round(w / 2), y: Math.round(h / 2) };
+  }, [selectedModelId, orientation]);
+
   // Animation Loop
   useEffect(() => {
     if (isPlaying && selectedCommand) {
@@ -1204,7 +1218,13 @@ function App() {
   const handleCreateNewCommand = () => {
     saveToHistory();
     const newId = crypto.randomUUID();
-    const initialPoints = resamplePath(DEFAULT_COMMAND_POINTS, 0.4);
+    const center = getCurrentCenter();
+    // Default Swipe Down from center
+    const defaultPoints: Point[] = [
+      { x: center.x, y: center.y - 50 },
+      { x: center.x, y: center.y + 50 },
+    ];
+    const initialPoints = resamplePath(defaultPoints, 0.4);
 
     // Create new command with one stroke
     const newCommand: Command = {
@@ -1288,6 +1308,50 @@ function App() {
     setCommandClipboard(JSON.parse(JSON.stringify(target)));
   };
 
+  const handleAddLineAction = (commandId: string) => {
+    saveToHistory();
+    const center = getCurrentCenter();
+    // デフォルトの縦方向ストローク (中央付近)
+    const newStroke: Point[] = Array(20)
+      .fill(0)
+      .map((_, i) => ({ x: center.x, y: center.y - 50 + i * 5 }));
+
+    setCommands((prev) => {
+      const updatedCommands = prev.map((cmd) =>
+        cmd.id === commandId
+          ? { ...cmd, strokes: [...cmd.strokes, newStroke] }
+          : cmd,
+      );
+      // 更新後のコマンドを見つけて、新しいストローク（末尾）を選択
+      const targetCmd = updatedCommands.find((c) => c.id === commandId);
+      if (targetCmd) {
+        setSelectedStrokeIndex(targetCmd.strokes.length - 1);
+      }
+      return updatedCommands;
+    });
+    setSelectionType("stroke");
+  };
+
+  const handleAddTapAction = (commandId: string) => {
+    saveToHistory();
+    const center = getCurrentCenter();
+    const newTap: Point[] = [{ x: center.x, y: center.y }];
+
+    setCommands((prev) => {
+      const updatedCommands = prev.map((cmd) =>
+        cmd.id === commandId
+          ? { ...cmd, strokes: [...cmd.strokes, newTap] }
+          : cmd,
+      );
+      const targetCmd = updatedCommands.find((c) => c.id === commandId);
+      if (targetCmd) {
+        setSelectedStrokeIndex(targetCmd.strokes.length - 1);
+      }
+      return updatedCommands;
+    });
+    setSelectionType("stroke");
+  };
+
   const handlePasteCommand = () => {
     if (!commandClipboard) return;
 
@@ -1354,8 +1418,8 @@ function App() {
         insertedStrokeIndex = insertIndex;
 
         const pastedStroke: Point[] = actionClipboard.stroke.map((p) => ({
-          x: p.x,
-          y: p.y,
+          x: p.x + 10,
+          y: p.y + 10,
         }));
         const newStrokes = [...cmd.strokes];
         newStrokes.splice(insertIndex, 0, pastedStroke);
@@ -2450,7 +2514,7 @@ function App() {
                 y: newPoints[newPoints.length - 1].y + deltaY,
               };
               if (newPoints.length) {
-                const currentPointsCount = stroke.length;
+                const currentPointsCount = newPoints.length;
                 const currentDuration = Math.max(
                   0.40,
                   (currentPointsCount - 1) / 60,
@@ -2933,6 +2997,8 @@ function App() {
           onUngroupStrokes={handleUngroupStrokes}
           onCopyAction={handleCopyAction}
           onPasteAction={handlePasteAction}
+          onAddLineAction={handleAddLineAction}
+          onAddTapAction={handleAddTapAction}
 
           canPasteAction={Boolean(selectedCommand) && Boolean(actionClipboard)}
           onBatchExport={handleBatchExport}

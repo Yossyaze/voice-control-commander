@@ -5,6 +5,7 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
+import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { type BackgroundImage } from "../api";
 import { useDialog } from "../contexts/DialogContext";
 
@@ -994,21 +995,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                         onPointerUp={stopNudgePress}
                         onPointerLeave={stopNudgePress}
                         onContextMenu={(e) => e.preventDefault()}
-                        className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 active:bg-gray-100 touch-none select-none"
+                        className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 active:bg-gray-100 touch-none select-none flex items-center justify-center transition-colors"
                       >
-                        <svg
-                          className="w-3 h-3"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M5 15l7-7 7 7"
-                          />
-                        </svg>
+                        <ChevronUp className="w-4 h-4 text-gray-600" />
                       </button>
                       <div />
                       <button
@@ -1016,23 +1005,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                         onPointerUp={stopNudgePress}
                         onPointerLeave={stopNudgePress}
                         onContextMenu={(e) => e.preventDefault()}
-                        className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 active:bg-gray-100 touch-none select-none"
+                        className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 active:bg-gray-100 touch-none select-none flex items-center justify-center transition-colors"
                       >
-                        <svg
-                          className="w-3 h-3"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 19l-7-7 7-7"
-                          />
-                        </svg>
+                        <ChevronLeft className="w-4 h-4 text-gray-600" />
                       </button>
-                      <div className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded-full text-[10px] text-gray-500">
+                      <div className="w-7 h-7 flex items-center justify-center bg-gray-100 rounded-full text-[9px] font-bold text-gray-400 border border-gray-200 shadow-inner">
                         1px
                       </div>
                       <button
@@ -1040,21 +1017,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                         onPointerUp={stopNudgePress}
                         onPointerLeave={stopNudgePress}
                         onContextMenu={(e) => e.preventDefault()}
-                        className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 active:bg-gray-100 touch-none select-none"
+                        className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 active:bg-gray-100 touch-none select-none flex items-center justify-center transition-colors"
                       >
-                        <svg
-                          className="w-3 h-3"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 5l7 7-7 7"
-                          />
-                        </svg>
+                        <ChevronRight className="w-4 h-4 text-gray-600" />
                       </button>
                       <div />
                       <button
@@ -1062,21 +1027,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                         onPointerUp={stopNudgePress}
                         onPointerLeave={stopNudgePress}
                         onContextMenu={(e) => e.preventDefault()}
-                        className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 active:bg-gray-100 touch-none select-none"
+                        className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-50 active:bg-gray-100 touch-none select-none flex items-center justify-center transition-colors"
                       >
-                        <svg
-                          className="w-3 h-3"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 9l-7-7 7-7"
-                          />
-                        </svg>
+                        <ChevronDown className="w-4 h-4 text-gray-600" />
                       </button>
                       <div />
                     </div>

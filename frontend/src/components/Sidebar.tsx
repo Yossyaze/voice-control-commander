@@ -1,5 +1,5 @@
 import React from "react";
-import { MousePointerClick, Spline } from "lucide-react";
+import { MousePointerClick, Spline, Save, FilePen, Check } from "lucide-react";
 import {
   DndContext,
   closestCenter,
@@ -71,6 +71,10 @@ interface SidebarProps {
   onDeleteProject: (id: string) => void;
   onRenameProject: (id: string) => void;
   hasUnsavedChanges: boolean;
+
+  // New action handlers
+  onAddLineAction: (commandId: string) => void;
+  onAddTapAction: (commandId: string) => void;
 }
 
 // ----------------------------------------------------------------------------
@@ -390,6 +394,8 @@ interface SortableCommandItemProps {
   onCopyAction?: (index?: number) => void;
   onPasteAction?: (index?: number) => void;
   canPasteAction?: boolean;
+  onAddLineAction?: (commandId: string) => void;
+  onAddTapAction?: (commandId: string) => void;
 }
 
 const SortableCommandItem = React.memo(
@@ -419,6 +425,8 @@ const SortableCommandItem = React.memo(
     onCopyAction,
     onPasteAction,
     canPasteAction,
+    onAddLineAction,
+    onAddTapAction,
   }: SortableCommandItemProps) => {
     const {
       attributes,
@@ -776,7 +784,7 @@ const SortableCommandItem = React.memo(
                         onCopy={() => onCopyAction?.(index)}
                         onDuplicate={() => {
                           // このアクションを複製して直下に追加
-                          const duplicatedStroke = stroke.map(p => ({ x: p.x, y: p.y }));
+                          const duplicatedStroke = stroke.map(p => ({ x: p.x + 10, y: p.y + 10 }));
                           const newStrokes = [...command.strokes];
                           newStrokes.splice(index + 1, 0, duplicatedStroke);
                           // メタデータも複製
@@ -845,19 +853,11 @@ const SortableCommandItem = React.memo(
 
 
 
-            {/* Add Action Buttons */}
             <div className="pt-3 pb-1 flex justify-center gap-1.5 border-t border-dashed border-gray-200 mt-2">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  // デフォルトの縦方向ストローク
-                  const newStroke: Point[] = Array(24)
-                    .fill(0)
-                    .map((_, i) => ({ x: 100, y: 400 + i * 5 }));
-                  onUpdateCommand({
-                    ...command,
-                    strokes: [...command.strokes, newStroke],
-                  });
+                  onAddLineAction?.(command.id);
                 }}
                 className="flex-1 px-1.5 py-1.5 text-[10px] font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded flex items-center justify-center transition-colors shadow-sm whitespace-nowrap"
               >
@@ -867,12 +867,7 @@ const SortableCommandItem = React.memo(
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  // タップポイント
-                  const newTap: Point[] = [{ x: 160, y: 400 }];
-                  onUpdateCommand({
-                    ...command,
-                    strokes: [...command.strokes, newTap],
-                  });
+                  onAddTapAction?.(command.id);
                 }}
                 className="flex-1 px-1.5 py-1.5 text-[10px] font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded flex items-center justify-center transition-colors shadow-sm whitespace-nowrap"
               >
@@ -957,6 +952,8 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
     onCopyAction,
     onPasteAction,
     canPasteAction,
+    onAddLineAction,
+    onAddTapAction,
     currentProjectId,
     projectsList,
     onLoadProject,
@@ -1032,9 +1029,9 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                   ? onSaveProject
                   : undefined
               }
-              className={`text-[10px] font-medium px-2 py-1 rounded transition-colors border ${
+              className={`text-[10px] font-medium px-2 py-1 rounded transition-colors border flex items-center space-x-1 ${
                 hasUnsavedChanges || !currentProjectId
-                  ? "text-blue-600 bg-blue-50 hover:bg-blue-100 border-blue-200"
+                  ? "text-blue-600 bg-blue-50 hover:bg-blue-100 border-blue-200 shadow-sm"
                   : "text-gray-500 bg-gray-50 border-gray-200 opacity-70 cursor-default"
               }`}
               title={
@@ -1043,14 +1040,25 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                   : "変更はありません"
               }
             >
-              {hasUnsavedChanges || !currentProjectId ? "💾 保存" : "✔️ 保存済"}
+              {hasUnsavedChanges || !currentProjectId ? (
+                <>
+                  <Save className="w-3 h-3" />
+                  <span>保存</span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-3 h-3" />
+                  <span>保存済</span>
+                </>
+              )}
             </button>
             <button
               onClick={onSaveAsProject}
-              className="text-[10px] font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded transition-colors"
+              className="text-[10px] font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded transition-colors flex items-center space-x-1 shadow-sm"
               title="名前を付けて新しいプロジェクトとして保存"
             >
-              📋 別名保存
+              <FilePen className="w-3 h-3" />
+              <span>別名保存</span>
             </button>
           </div>
         </div>
@@ -1232,7 +1240,13 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 6h.01M12 13h.01M12 17h.01"
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2.5}
+                d="M12 11v5m-2.5-2.5h5"
               />
             </svg>
           </button>
@@ -1380,6 +1394,8 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                     onUngroupStrokes={onUngroupStrokes}
                     onCopyAction={onCopyAction}
                     onPasteAction={onPasteAction}
+                    onAddLineAction={onAddLineAction}
+                    onAddTapAction={onAddTapAction}
                     canPasteAction={
                       cmd.id === activeCommandId && Boolean(canPasteAction)
                     }
