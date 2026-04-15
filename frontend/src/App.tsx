@@ -442,11 +442,6 @@ const DEVICE_MODELS: DeviceModel[] = [
   },
 ];
 
-const DEFAULT_COMMAND_POINTS: Point[] = [
-  { x: 160, y: 400 }, // Start point
-  { x: 160, y: 500 }, // End point (Swipe Down)
-];
-
 const COMMAND_COLORS = [
   "#ef4444", // Red 500
   "#f97316", // Orange 500
