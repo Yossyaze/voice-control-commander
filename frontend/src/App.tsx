@@ -3045,12 +3045,6 @@ function App() {
               prev.map((c) => (c.id === id ? { ...c, name } : c)),
             );
           }}
-          onUpdateCommand={(updatedCmd) => {
-            saveToHistory();
-            setCommands((prev) =>
-              prev.map((c) => (c.id === updatedCmd.id ? updatedCmd : c)),
-            );
-          }}
           selectedStrokeIndex={selectedStrokeIndex}
           onSelectStroke={setSelectedStrokeIndex}
           selectionType={selectionType}

@@ -32,7 +32,6 @@ interface SidebarProps {
   canCopyCommand: boolean;
   canPasteCommand: boolean;
   onRenameCommand: (id: string, newName: string) => void;
-  onUpdateCommand: (cmd: Command) => void;
   selectedStrokeIndex: number | null;
   onSelectStroke: (index: number | null) => void;
   selectionType?: "stroke" | "wait";
@@ -379,7 +378,6 @@ interface SortableCommandItemProps {
   onDelete: () => void;
   onDuplicate: () => void;
   onCopy: () => void;
-  onUpdateCommand: (cmd: Command) => void;
 
   // Props for Stroke Selection/Sorting inside
   selectedStrokeIndex: number | null;
@@ -416,7 +414,6 @@ const SortableCommandItem = React.memo(
     onDelete,
     onDuplicate,
     onCopy,
-    onUpdateCommand,
     selectedStrokeIndex,
     selectionType,
     onSelectStroke,
@@ -917,7 +914,6 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
     canCopyCommand,
     canPasteCommand,
     onRenameCommand,
-    onUpdateCommand,
     selectedStrokeIndex,
     onSelectStroke,
     selectionType = "stroke",
@@ -1364,7 +1360,6 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                     onDelete={() => onDeleteCommand(cmd.id)}
                     onDuplicate={() => onDuplicateCommand(cmd.id)}
                     onCopy={() => onCopyCommand?.(cmd.id)}
-                    onUpdateCommand={onUpdateCommand}
                     selectedStrokeIndex={selectedStrokeIndex}
                     selectionType={selectionType}
                     onSelectStroke={onSelectStroke}
