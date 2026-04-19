@@ -75,6 +75,10 @@ interface SidebarProps {
   // New action handlers
   onAddLineAction: (commandId: string) => void;
   onAddTapAction: (commandId: string) => void;
+
+  // ストローク操作コールバック（stale closure対策でApp側で処理）
+  onDeleteStroke: (commandId: string, strokeIndex: number) => void;
+  onDuplicateStroke: (commandId: string, strokeIndex: number) => void;
 }
 
 // ----------------------------------------------------------------------------
@@ -396,6 +400,8 @@ interface SortableCommandItemProps {
   canPasteAction?: boolean;
   onAddLineAction?: (commandId: string) => void;
   onAddTapAction?: (commandId: string) => void;
+  onDeleteStroke?: (commandId: string, strokeIndex: number) => void;
+  onDuplicateStroke?: (commandId: string, strokeIndex: number) => void;
 }
 
 const SortableCommandItem = React.memo(
@@ -427,6 +433,8 @@ const SortableCommandItem = React.memo(
     canPasteAction,
     onAddLineAction,
     onAddTapAction,
+    onDeleteStroke,
+    onDuplicateStroke,
   }: SortableCommandItemProps) => {
     const {
       attributes,
@@ -783,23 +791,8 @@ const SortableCommandItem = React.memo(
                         }
                         onCopy={() => onCopyAction?.(index)}
                         onDuplicate={() => {
-                          // このアクションを複製して直下に追加
-                          const duplicatedStroke = stroke.map(p => ({ x: p.x + 10, y: p.y + 10 }));
-                          const newStrokes = [...command.strokes];
-                          newStrokes.splice(index + 1, 0, duplicatedStroke);
-                          // メタデータも複製
-                          let newMetadata = command.strokeMetadata;
-                          if (command.strokeMetadata) {
-                            const metadata = [...command.strokeMetadata];
-                            const srcMeta = metadata[index] || {};
-                            metadata.splice(index + 1, 0, { ...srcMeta });
-                            newMetadata = metadata;
-                          }
-                          onUpdateCommand({
-                            ...command,
-                            strokes: newStrokes,
-                            strokeMetadata: newMetadata,
-                          });
+                          // App側のコールバックを使用（stale closure対策）
+                          onDuplicateStroke?.(command.id, index);
                         }}
                         onSelect={() => {
                         onSelectStroke(index);
@@ -809,15 +802,8 @@ const SortableCommandItem = React.memo(
                         onToggleSelectStroke?.(index);
                       }}
                       onDelete={() => {
-                        const newStrokes = [...command.strokes];
-                        newStrokes.splice(index, 1);
-                        onUpdateCommand({ ...command, strokes: newStrokes });
-                        if (selectedStrokeIndex === index) onSelectStroke(null);
-                        else if (
-                          selectedStrokeIndex !== null &&
-                          index < selectedStrokeIndex
-                        )
-                          onSelectStroke(selectedStrokeIndex - 1);
+                        // App側のコールバックを使用（stale closure対策）
+                        onDeleteStroke?.(command.id, index);
                       }}
                     />
                   </React.Fragment>
@@ -954,6 +940,8 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
     canPasteAction,
     onAddLineAction,
     onAddTapAction,
+    onDeleteStroke,
+    onDuplicateStroke,
     currentProjectId,
     projectsList,
     onLoadProject,
@@ -1396,6 +1384,8 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                     onPasteAction={onPasteAction}
                     onAddLineAction={onAddLineAction}
                     onAddTapAction={onAddTapAction}
+                    onDeleteStroke={onDeleteStroke}
+                    onDuplicateStroke={onDuplicateStroke}
                     canPasteAction={
                       cmd.id === activeCommandId && Boolean(canPasteAction)
                     }

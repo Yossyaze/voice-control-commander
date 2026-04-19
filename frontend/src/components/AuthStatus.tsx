@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
-import { Cloud, LogIn, LogOut, User } from "lucide-react";
+import { CloudCheck, CloudOff, LogIn, LogOut, User } from "lucide-react";
 
 const AuthStatus: React.FC = () => {
   const { currentUser, loginWithGoogle, logout } = useAuth();
@@ -38,7 +38,11 @@ const AuthStatus: React.FC = () => {
         }`}
         title="クラウド設定"
       >
-        <Cloud className="w-5 h-5" />
+        {currentUser ? (
+          <CloudCheck className="w-5 h-5" />
+        ) : (
+          <CloudOff className="w-5 h-5" />
+        )}
       </button>
 
       {/* ポップオーバーメニュー */}

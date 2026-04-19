@@ -496,6 +496,12 @@ function App() {
     loadState<Command[]>("commands", []),
   );
 
+  // --- commands の最新値を常に参照できる Ref（stale closure 対策）---
+  const commandsRef = useRef<Command[]>(commands);
+  useEffect(() => {
+    commandsRef.current = commands;
+  }, [commands]);
+
   // --- プロジェクト状態 ---
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(() =>
     loadState<string | null>("currentProjectId", null),
@@ -732,15 +738,15 @@ function App() {
   const [pastLevels, setPastLevels] = useState<Command[][]>([]);
   const [futureLevels, setFutureLevels] = useState<Command[][]>([]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const saveToHistory = (currentCommands?: Command[]) => {
-    const stateToSave = currentCommands || commands;
+  // commandsRef を使って常に最新の commands を参照（stale closure 対策）
+  const saveToHistory = useCallback(() => {
+    const stateToSave = commandsRef.current;
     setPastLevels((prev) => [
       ...prev,
       JSON.parse(JSON.stringify(stateToSave)),
     ]);
     setFutureLevels([]);
-  };
+  }, []);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleUndo = () => {
@@ -1275,30 +1281,31 @@ function App() {
   };
 
   const handleDuplicateCommand = (id: string) => {
-    const cmdToCopy = commands.find((c) => c.id === id);
-    if (!cmdToCopy) return;
-
     saveToHistory();
-    const duplicatedCommand = createPastedCommand(cmdToCopy, commands);
-    const newId = duplicatedCommand.id;
-
     setCommands((prev) => {
+      const cmdToCopy = prev.find((c) => c.id === id);
+      if (!cmdToCopy) return prev;
+      const duplicatedCommand = createPastedCommand(cmdToCopy, prev);
       const index = prev.findIndex((c) => c.id === id);
-      if (index === -1) return [...prev, duplicatedCommand];
       const next = [...prev];
-      next.splice(index + 1, 0, duplicatedCommand);
+      if (index === -1) {
+        next.push(duplicatedCommand);
+      } else {
+        next.splice(index + 1, 0, duplicatedCommand);
+      }
+      // 副作用: 新しいコマンドを選択
+      setActiveCommandId(duplicatedCommand.id);
+      setSelectedStrokeIndex(0);
+      setSelectionType("stroke");
       return next;
     });
-
-    setActiveCommandId(newId);
-    setSelectedStrokeIndex(0);
-    setSelectionType("stroke");
   };
 
   const handleCopyCommand = (id?: string) => {
     const targetId = id || activeCommandId;
     if (!targetId) return;
-    const target = commands.find((c) => c.id === targetId);
+    // commandsRef で最新の commands を参照（stale closure 対策）
+    const target = commandsRef.current.find((c) => c.id === targetId);
     if (!target) return;
     setCommandClipboard(JSON.parse(JSON.stringify(target)));
   };
@@ -1306,17 +1313,18 @@ function App() {
   const handleAddLineAction = (commandId: string) => {
     saveToHistory();
     const center = getCurrentCenter();
-    // デフォルトの縦方向ストローク (中央付近)
-    const newStroke: Point[] = Array(20)
-      .fill(0)
-      .map((_, i) => ({ x: center.x, y: center.y - 50 + i * 5 }));
+    const defaultPoints: Point[] = [
+      { x: center.x, y: center.y - 50 },
+      { x: center.x, y: center.y + 50 },
+    ];
+    const newStroke = resamplePath(defaultPoints, 0.4);
 
     setCommands((prev) => {
-      const updatedCommands = prev.map((cmd) =>
-        cmd.id === commandId
-          ? { ...cmd, strokes: [...cmd.strokes, newStroke] }
-          : cmd,
-      );
+      const updatedCommands = prev.map((cmd) => {
+        if (cmd.id !== commandId) return cmd;
+        const newStrokes = [...cmd.strokes, newStroke];
+        return { ...cmd, strokes: newStrokes };
+      });
       // 更新後のコマンドを見つけて、新しいストローク（末尾）を選択
       const targetCmd = updatedCommands.find((c) => c.id === commandId);
       if (targetCmd) {
@@ -1333,11 +1341,11 @@ function App() {
     const newTap: Point[] = [{ x: center.x, y: center.y }];
 
     setCommands((prev) => {
-      const updatedCommands = prev.map((cmd) =>
-        cmd.id === commandId
-          ? { ...cmd, strokes: [...cmd.strokes, newTap] }
-          : cmd,
-      );
+      const updatedCommands = prev.map((cmd) => {
+        if (cmd.id !== commandId) return cmd;
+        const newStrokes = [...cmd.strokes, newTap];
+        return { ...cmd, strokes: newStrokes };
+      });
       const targetCmd = updatedCommands.find((c) => c.id === commandId);
       if (targetCmd) {
         setSelectedStrokeIndex(targetCmd.strokes.length - 1);
@@ -1351,9 +1359,9 @@ function App() {
     if (!commandClipboard) return;
 
     saveToHistory();
-    const insertedCommand = createPastedCommand(commandClipboard, commands);
-
+    // setCommands の関数型更新内で prev（最新値）を使って名前・色を決定
     setCommands((prev) => {
+      const insertedCommand = createPastedCommand(commandClipboard, prev);
       const insertAfterIndex = activeCommandId
         ? prev.findIndex((c) => c.id === activeCommandId)
         : -1;
@@ -1363,14 +1371,14 @@ function App() {
       } else {
         next.splice(insertAfterIndex + 1, 0, insertedCommand);
       }
+      // 副作用: ペーストしたコマンドを選択
+      setActiveCommandId(insertedCommand.id);
+      setSelectedStrokeIndex(
+        insertedCommand.strokes && insertedCommand.strokes.length > 0 ? 0 : null,
+      );
+      setSelectionType("stroke");
       return next;
     });
-
-    setActiveCommandId(insertedCommand.id);
-    setSelectedStrokeIndex(
-      insertedCommand.strokes && insertedCommand.strokes.length > 0 ? 0 : null,
-    );
-    setSelectionType("stroke");
   };
 
   const handleCopyAction = (index?: number) => {
@@ -1839,20 +1847,81 @@ function App() {
         if (selectedStrokeIndex < newStrokes.length) {
           newStrokes.splice(selectedStrokeIndex, 1);
         }
-        return { ...cmd, strokes: newStrokes };
+        // strokeMetadata も同期して削除
+        let newMetadata = cmd.strokeMetadata;
+        if (newMetadata) {
+          newMetadata = [...newMetadata];
+          if (selectedStrokeIndex < newMetadata.length) {
+            newMetadata.splice(selectedStrokeIndex, 1);
+          }
+        }
+        return { ...cmd, strokes: newStrokes, strokeMetadata: newMetadata };
       }),
     );
 
-    // Adjust selection
+    // 選択インデックスの調整
     if (selectedStrokeIndex > 0) {
       setSelectedStrokeIndex(selectedStrokeIndex - 1);
     } else {
-      setSelectedStrokeIndex(null); // Deselect if 0 was deleted, or maybe stay null
-      // If there are still strokes, maybe select 0?
-      // Logic: if 0 deleted and others remain -> select new 0?
-      // Let's stick to null (command selection) to be safe or index 0 if exists?
-      // Let's just go null for now.
+      setSelectedStrokeIndex(null);
     }
+  };
+
+  // ==== Sidebar用ストローク削除・複製コールバック ====
+  // Sidebar内でpropsのcommandを直接操作するとstaleデータを参照する問題を解決
+  const handleDeleteStroke = (commandId: string, strokeIndex: number) => {
+    saveToHistory();
+    setCommands((prev) =>
+      prev.map((cmd) => {
+        if (cmd.id !== commandId) return cmd;
+        const newStrokes = [...cmd.strokes];
+        if (strokeIndex < newStrokes.length) {
+          newStrokes.splice(strokeIndex, 1);
+        }
+        // strokeMetadata も同期して削除
+        let newMetadata = cmd.strokeMetadata;
+        if (newMetadata) {
+          newMetadata = [...newMetadata];
+          if (strokeIndex < newMetadata.length) {
+            newMetadata.splice(strokeIndex, 1);
+          }
+        }
+        return { ...cmd, strokes: newStrokes, strokeMetadata: newMetadata };
+      }),
+    );
+    // 選択インデックスの調整
+    if (selectedStrokeIndex === strokeIndex) {
+      setSelectedStrokeIndex(null);
+    } else if (selectedStrokeIndex !== null && strokeIndex < selectedStrokeIndex) {
+      setSelectedStrokeIndex(selectedStrokeIndex - 1);
+    }
+  };
+
+  const handleDuplicateStroke = (commandId: string, strokeIndex: number) => {
+    saveToHistory();
+    setCommands((prev) =>
+      prev.map((cmd) => {
+        if (cmd.id !== commandId) return cmd;
+        const stroke = cmd.strokes[strokeIndex];
+        if (!stroke) return cmd;
+        // 少しオフセットして複製
+        const duplicatedStroke = stroke.map((p) => ({ x: p.x + 10, y: p.y + 10 }));
+        const newStrokes = [...cmd.strokes];
+        newStrokes.splice(strokeIndex + 1, 0, duplicatedStroke);
+        // メタデータも複製
+        let newMetadata = cmd.strokeMetadata;
+        if (newMetadata) {
+          const metadata = [...newMetadata];
+          const srcMeta = metadata[strokeIndex] || {};
+          metadata.splice(strokeIndex + 1, 0, { ...srcMeta });
+          newMetadata = metadata;
+        }
+        return { ...cmd, strokes: newStrokes, strokeMetadata: newMetadata };
+      }),
+    );
+    // 複製したストロークを選択
+    setSelectedStrokeIndex(strokeIndex + 1);
+    setSelectionType("stroke");
   };
 
   // ==== 角度反転ハンドラー ====
@@ -2176,16 +2245,18 @@ function App() {
       return;
 
     saveToHistory();
-    setCommands((prev) => prev.filter((c) => !checkedCommandIds.has(c.id)));
+    setCommands((prev) => {
+      const remaining = prev.filter((c) => !checkedCommandIds.has(c.id));
+      // 削除対象にアクティブコマンドが含まれていたら次を選択
+      if (activeCommandId && checkedCommandIds.has(activeCommandId)) {
+        setActiveCommandId(remaining.length > 0 ? remaining[0].id : null);
+        setSelectedStrokeIndex(null);
+      }
+      return remaining;
+    });
 
-    // Clear selection
+    // チェック状態をクリア
     setCheckedCommandIds(new Set());
-    if (activeCommandId && checkedCommandIds.has(activeCommandId)) {
-      // 削除後の残りコマンドから先頭を選択
-      const remaining = commands.filter((c) => !checkedCommandIds.has(c.id));
-      setActiveCommandId(remaining.length > 0 ? remaining[0].id : null);
-      setSelectedStrokeIndex(null);
-    }
   };
 
   const handleToggleSelectCommand = (id: string, multi: boolean) => {
@@ -2931,19 +3002,21 @@ function App() {
           onSelectCommand={setActiveCommandId}
           onDeleteCommand={(id) => {
             saveToHistory();
-            const idx = commands.findIndex((c) => c.id === id);
-            const newCommands = commands.filter((c) => c.id !== id);
-            setCommands(newCommands);
-            // 削除したのが選択中のコマンドなら次を選択
-            if (activeCommandId === id) {
-              if (newCommands.length > 0) {
-                const nextIdx = Math.min(idx, newCommands.length - 1);
-                setActiveCommandId(newCommands[nextIdx].id);
-              } else {
-                setActiveCommandId(null);
+            setCommands((prev) => {
+              const idx = prev.findIndex((c) => c.id === id);
+              const newCommands = prev.filter((c) => c.id !== id);
+              // 削除したのが選択中のコマンドなら次を選択
+              if (activeCommandId === id) {
+                if (newCommands.length > 0) {
+                  const nextIdx = Math.min(idx, newCommands.length - 1);
+                  setActiveCommandId(newCommands[nextIdx].id);
+                } else {
+                  setActiveCommandId(null);
+                }
+                setSelectedStrokeIndex(null);
               }
-              setSelectedStrokeIndex(null);
-            }
+              return newCommands;
+            });
           }}
           onDuplicateCommand={handleDuplicateCommand}
           onToggleVisibility={(id) => {
@@ -2994,6 +3067,8 @@ function App() {
           onPasteAction={handlePasteAction}
           onAddLineAction={handleAddLineAction}
           onAddTapAction={handleAddTapAction}
+          onDeleteStroke={handleDeleteStroke}
+          onDuplicateStroke={handleDuplicateStroke}
 
           canPasteAction={Boolean(selectedCommand) && Boolean(actionClipboard)}
           onBatchExport={handleBatchExport}
