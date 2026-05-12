@@ -52,8 +52,10 @@ interface ControlPanelProps {
   onAngleChange: (angle: number) => void;
   length: number;
   onLengthChange: (length: number) => void;
-  absoluteX?: number;
-  absoluteY?: number;
+  startX?: number;
+  startY?: number;
+  endX?: number;
+  endY?: number;
   onCurve: () => void;
   onStraight: () => void;
   isActionSelected?: boolean;
@@ -193,8 +195,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   onLengthChange,
   onCurve,
   onStraight,
-  absoluteX,
-  absoluteY,
+  startX,
+  startY,
+  endX,
+  endY,
   isActionSelected,
   waitDuration,
   onWaitDurationChange,
@@ -353,10 +357,14 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     return items;
   }, [backgroundFolders, backgroundsList]);
 
-  useEffect(() => {
-    if (folderItems.some((item) => item.key === selectedFolderKey)) return;
-    setSelectedFolderKey("__all__");
-  }, [folderItems, selectedFolderKey]);
+  // folderItemsが変更され、現在の選択キーが無効になった場合にリセットする（Effectを使わないパターン）
+  const [prevFolderItems, setPrevFolderItems] = useState(folderItems);
+  if (folderItems !== prevFolderItems) {
+    setPrevFolderItems(folderItems);
+    if (!folderItems.some((item) => item.key === selectedFolderKey)) {
+      setSelectedFolderKey("__all__");
+    }
+  }
 
   const visibleBackgrounds = useMemo(() => {
     if (selectedFolderKey === "__all__") return backgroundsList;
@@ -960,26 +968,40 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 {/* Position and Nudge Controls */}
                 <div className="flex bg-gray-50 p-2 rounded border border-gray-200">
                   {/* Left: Position Info */}
-                  <div className="flex flex-col justify-center space-y-3 pr-3 border-r border-gray-200 mr-3 min-w-[70px]">
-                    <div>
-                      <span className="text-[10px] text-gray-400 block uppercase">
-                        開始 X
-                      </span>
-                      <span className="font-mono text-gray-700 text-sm">
-                        {absoluteX !== undefined
-                          ? formatCoord(absoluteX)
-                          : "--"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-gray-400 block uppercase">
-                        開始 Y
-                      </span>
-                      <span className="font-mono text-gray-700 text-sm">
-                        {absoluteY !== undefined
-                          ? formatCoord(absoluteY)
-                          : "--"}
-                      </span>
+                  <div className="flex flex-col justify-center space-y-3 pr-3 border-r border-gray-200 mr-3 min-w-[140px]">
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                      <div>
+                        <span className="text-[10px] text-gray-400 block uppercase">
+                          開始 X
+                        </span>
+                        <span className="font-mono text-gray-700 text-sm">
+                          {startX !== undefined ? formatCoord(startX) : "--"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-gray-400 block uppercase">
+                          終了 X
+                        </span>
+                        <span className="font-mono text-gray-700 text-sm">
+                          {endX !== undefined ? formatCoord(endX) : "--"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-gray-400 block uppercase">
+                          開始 Y
+                        </span>
+                        <span className="font-mono text-gray-700 text-sm">
+                          {startY !== undefined ? formatCoord(startY) : "--"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-gray-400 block uppercase">
+                          終了 Y
+                        </span>
+                        <span className="font-mono text-gray-700 text-sm">
+                          {endY !== undefined ? formatCoord(endY) : "--"}
+                        </span>
+                      </div>
                     </div>
                   </div>
 

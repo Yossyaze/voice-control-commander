@@ -1615,7 +1615,7 @@ function App() {
             }
             return stroke;
           });
-          const legacyPoints = newStrokes.length > 0 ? newStrokes[0] : [];
+          const legacyPoints = (newStrokes.length > 0 && newStrokes[0].length > 0) ? newStrokes[0] : [];
           return { ...cmd, strokes: newStrokes, points: legacyPoints };
         }),
       );
@@ -1681,7 +1681,7 @@ function App() {
           return newPoints;
         });
 
-        const legacyPoints = newStrokes.length > 0 ? newStrokes[0] : [];
+        const legacyPoints = (newStrokes.length > 0 && newStrokes[0].length > 0) ? newStrokes[0] : [];
         return { ...cmd, strokes: newStrokes, points: legacyPoints };
       }),
     );
@@ -1719,7 +1719,7 @@ function App() {
           return newPoints;
         });
 
-        const legacyPoints = newStrokes.length > 0 ? newStrokes[0] : [];
+        const legacyPoints = (newStrokes.length > 0 && newStrokes[0].length > 0) ? newStrokes[0] : [];
         return { ...cmd, strokes: newStrokes, points: legacyPoints };
       }),
     );
@@ -1761,7 +1761,7 @@ function App() {
           }));
         });
 
-        const legacyPoints = newStrokes.length > 0 ? newStrokes[0] : [];
+        const legacyPoints = (newStrokes.length > 0 && newStrokes[0].length > 0) ? newStrokes[0] : [];
         return { ...cmd, strokes: newStrokes, points: legacyPoints };
       }),
     );
@@ -1777,22 +1777,34 @@ function App() {
     return points ? calculateLength(points) : 0;
   }, [getSelectedStrokePoints]);
 
-  const currentHeadX = useMemo(() => {
+  const currentStartX = useMemo(() => {
     const points = getSelectedStrokePoints();
-    if (points && points.length > 0) {
-      const start = points[0];
-      const end = points[points.length - 1];
-      return (start.x + end.x) / 2;
+    if (points && points.length > 0 && points[0]) {
+      return points[0].x;
     }
     return 0;
   }, [getSelectedStrokePoints]);
 
-  const currentHeadY = useMemo(() => {
+  const currentStartY = useMemo(() => {
     const points = getSelectedStrokePoints();
-    if (points && points.length > 0) {
-      const start = points[0];
-      const end = points[points.length - 1];
-      return (start.y + end.y) / 2;
+    if (points && points.length > 0 && points[0]) {
+      return points[0].y;
+    }
+    return 0;
+  }, [getSelectedStrokePoints]);
+
+  const currentEndX = useMemo(() => {
+    const points = getSelectedStrokePoints();
+    if (points && points.length > 0 && points[points.length - 1]) {
+      return points[points.length - 1].x;
+    }
+    return 0;
+  }, [getSelectedStrokePoints]);
+
+  const currentEndY = useMemo(() => {
+    const points = getSelectedStrokePoints();
+    if (points && points.length > 0 && points[points.length - 1]) {
+      return points[points.length - 1].y;
     }
     return 0;
   }, [getSelectedStrokePoints]);
@@ -1970,29 +1982,24 @@ function App() {
         const isCommandSelected = cmd.id === activeCommandId;
 
         // Map each stroke
-        return cmd.strokes.map((stroke, index) => {
-          // Highlight logic:
-          // 1. If Command is NOT selected -> False
-          // 2. If Command IS selected:
-          //    a. If selectedStrokeIndex is NULL -> Highlights ALL strokes (True)
-          //    b. If selectedStrokeIndex matches index -> True
-          //    c. Otherwise -> False
+        return cmd.strokes
+          .filter((s) => Array.isArray(s))
+          .map((stroke, index) => {
+            const isSelected =
+              isCommandSelected &&
+              (selectedStrokeIndex === null || selectedStrokeIndex === index);
 
-          const isSelected =
-            isCommandSelected &&
-            (selectedStrokeIndex === null || selectedStrokeIndex === index);
-
-          return {
-            id: `${cmd.id}_stroke_${index}`,
-            fileId: "N/A",
-            commandId: cmd.id,
-            points: stroke,
-            color: cmd.color || "#000",
-            isSelected: isSelected,
-            label: isSelected ? String(index + 1) : undefined,
-            showPoints: cmd.showPoints, // <-- Action-specific showPoints
-          };
-        });
+            return {
+              id: `${cmd.id}_stroke_${index}`,
+              fileId: "N/A",
+              commandId: cmd.id,
+              points: stroke,
+              color: cmd.color || "#000",
+              isSelected: isSelected,
+              label: isSelected ? String(index + 1) : undefined,
+              showPoints: cmd.showPoints, // <-- Action-specific showPoints
+            };
+          });
       });
   }, [commands, activeCommandId, selectedStrokeIndex]);
 
@@ -2594,7 +2601,7 @@ function App() {
 
         // Update legacy points for preview if first stroke changed
         const newLegacyPoints =
-          newStrokes.length > 0 ? newStrokes[0] : cmd.points;
+          (newStrokes.length > 0 && newStrokes[0].length > 0) ? newStrokes[0] : cmd.points;
 
         return { ...cmd, strokes: newStrokes, points: newLegacyPoints };
       }),
@@ -2941,12 +2948,6 @@ function App() {
             waitAfter: newDuration,
           };
         } else {
-          // If no stroke selected, maybe update global default? Or update ALL?
-          // User requested individual editing. "If not selected, global editing".
-          // We already separate that in UI. If this is called, it SHOULD correspond to a selected stroke OR explicitly global.
-          // But the UI slider calls this handler.
-          // If selectedStrokeIndex is null, we shouldn't be calling "SelectedStrokeWaitChange".
-          // But let's support "Update All" here if needed? No, use handleWaitDurationChange for that.
           // So this does nothing if index is null.
           return c;
         }
@@ -3534,8 +3535,10 @@ function App() {
             onCurve={handleCurve}
             onStraight={handleMakeStraight}
             onFlip={handleFlip}
-            absoluteX={currentHeadX}
-            absoluteY={currentHeadY}
+            startX={currentStartX}
+            startY={currentStartY}
+            endX={currentEndX}
+            endY={currentEndY}
             isActionSelected={selectedStrokeIndex !== null}
             waitDuration={
               selectedCommand?.waitDuration !== undefined

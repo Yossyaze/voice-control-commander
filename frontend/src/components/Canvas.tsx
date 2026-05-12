@@ -198,15 +198,21 @@ const Canvas: React.FC<CanvasProps> = ({
         // Check if it's a Tap (single point OR multiple points at same location)
         const isTap =
           path.points.length === 1 ||
-          path.points.every(
-            (p) =>
-              Math.abs(p.x - path.points[0].x) < 0.1 &&
-              Math.abs(p.y - path.points[0].y) < 0.1,
-          );
+          (Array.isArray(path.points) &&
+            path.points.length > 0 &&
+            path.points[0] &&
+            path.points.every(
+              (p) =>
+                p &&
+                path.points[0] &&
+                Math.abs(p.x - path.points[0].x) < 0.1 &&
+                Math.abs(p.y - path.points[0].y) < 0.1,
+            ));
 
         if (isTap) {
           // Draw Tap (Dot)
           const point = path.points[0];
+          if (!point) return;
           ctx.beginPath();
           ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
           ctx.fillStyle = path.color + "40"; // Transparent fill
@@ -237,9 +243,14 @@ const Canvas: React.FC<CanvasProps> = ({
         } else {
           // Draw Path (Line)
           ctx.beginPath();
-          ctx.moveTo(path.points[0].x, path.points[0].y);
+          if (path.points[0]) {
+            ctx.moveTo(path.points[0].x, path.points[0].y);
+          }
           for (let i = 1; i < path.points.length; i++) {
-            ctx.lineTo(path.points[i].x, path.points[i].y);
+            const p = path.points[i];
+            if (p) {
+              ctx.lineTo(p.x, p.y);
+            }
           }
           ctx.strokeStyle = path.color;
           ctx.lineWidth = path.isSelected ? 2 : 1;
@@ -252,38 +263,32 @@ const Canvas: React.FC<CanvasProps> = ({
             const pointRadius = path.isSelected ? 4 : 2.5; // Smaller for non-selected
 
             // Start Point (Green)
-            ctx.fillStyle = "#10B981";
-            ctx.beginPath();
-            ctx.arc(
-              path.points[0].x,
-              path.points[0].y,
-              pointRadius,
-              0,
-              Math.PI * 2,
-            );
-            ctx.fill();
+            const pStart = path.points[0];
+            if (pStart) {
+              ctx.fillStyle = "#10B981";
+              ctx.beginPath();
+              ctx.arc(pStart.x, pStart.y, pointRadius, 0, Math.PI * 2);
+              ctx.fill();
+            }
 
             // End Point (Red)
-            ctx.fillStyle = "#EF4444";
-            ctx.beginPath();
-            ctx.arc(
-              path.points[path.points.length - 1].x,
-              path.points[path.points.length - 1].y,
-              pointRadius,
-              0,
-              Math.PI * 2,
-            );
-            ctx.fill();
+            const pEnd = path.points[path.points.length - 1];
+            if (pEnd) {
+              ctx.fillStyle = "#EF4444";
+              ctx.beginPath();
+              ctx.arc(pEnd.x, pEnd.y, pointRadius, 0, Math.PI * 2);
+              ctx.fill();
+            }
           }
 
           // Draw Label at Start Point (offset opposite to direction)
-          if (path.label) {
+          if (path.label && path.points[0]) {
             const p0 = path.points[0];
             let labelX = p0.x;
             let labelY = p0.y - 25; // Default offset (up)
 
-            if (path.points.length > 1) {
-              const p1 = path.points[1];
+            const p1 = path.points[1];
+            if (p1) {
               const dx = p1.x - p0.x;
               const dy = p1.y - p0.y;
               const len = Math.sqrt(dx * dx + dy * dy);
@@ -333,6 +338,7 @@ const Canvas: React.FC<CanvasProps> = ({
       badgesRef.current = []; // Clear previous badges
       if (connections.length > 0) {
         connections.forEach((conn) => {
+          if (!conn.from || !conn.to) return;
           // Draw dashed line
           ctx.beginPath();
           ctx.moveTo(conn.from.x, conn.from.y);
@@ -679,11 +685,16 @@ const Canvas: React.FC<CanvasProps> = ({
 
       const isTap =
         path.points.length === 1 ||
-        path.points.every(
-          (p) =>
-            Math.abs(p.x - path.points[0].x) < 0.1 &&
-            Math.abs(p.y - path.points[0].y) < 0.1,
-        );
+        (Array.isArray(path.points) &&
+          path.points.length > 0 &&
+          path.points[0] &&
+          path.points.every(
+            (p) =>
+              p &&
+              path.points[0] &&
+              Math.abs(p.x - path.points[0].x) < 0.1 &&
+              Math.abs(p.y - path.points[0].y) < 0.1,
+          ));
 
       if (isTap) {
         // Check hit on Tap (Dot)
