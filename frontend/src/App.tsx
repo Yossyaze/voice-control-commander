@@ -3,6 +3,7 @@ import { arrayMove } from "@dnd-kit/sortable";
 import Canvas from "./components/Canvas";
 import ControlPanel from "./components/ControlPanel";
 import Sidebar from "./components/Sidebar";
+import ProjectMenu from "./components/ProjectMenu";
 import AuthStatus from "./components/AuthStatus";
 import { useAuth } from "./contexts/AuthContext";
 import { useDialog } from "./contexts/DialogContext";
@@ -489,7 +490,7 @@ function saveState<T>(key: string, value: T): void {
 }
 
 function App() {
-  const { confirm, prompt, alert } = useDialog();
+  const { confirm, prompt, alert, confirmUnsaved } = useDialog();
 
   // --- 永続化される状態 (localStorage から復元) ---
   const [commands, setCommands] = useState<Command[]>(() =>
@@ -548,7 +549,7 @@ function App() {
     };
   };
 
-  const handleCreateProject = async (name: string) => {
+  const handleCreateProject = async (name: string): Promise<boolean> => {
     try {
       const data = await createProject({
         name,
@@ -560,24 +561,27 @@ function App() {
         setCurrentProjectName(data.name);
         setProjectsList((prev) => [...prev, { id: data.id!, name: data.name }]);
         setSavedCommandsJSON(JSON.stringify(data.commands));
-        alert("プロジェクトを作成しました");
+        await alert("プロジェクトを作成しました");
+        return true;
       }
+      return false;
     } catch (err) {
       console.error(err);
-      alert("プロジェクトの作成に失敗しました");
+      await alert("プロジェクトの作成に失敗しました");
+      return false;
     }
   };
 
-  const handleSaveProject = async () => {
+  const handleSaveProject = async (): Promise<boolean> => {
     if (!currentProjectId) {
       const name = await prompt(
         "新しいプロジェクト名を入力してください:",
         currentProjectName,
       );
-      if (name) {
-        await handleCreateProject(name);
+      if (name && name.trim()) {
+        return await handleCreateProject(name.trim());
       }
-      return;
+      return false;
     }
     try {
       await updateProject(currentProjectId, {
@@ -586,9 +590,11 @@ function App() {
         settings: buildProjectSettings(),
       });
       setSavedCommandsJSON(JSON.stringify(commands));
+      return true;
     } catch (err) {
       console.error(err);
       await alert("保存に失敗しました");
+      return false;
     }
   };
 
@@ -606,12 +612,21 @@ function App() {
   };
 
   const handleLoadProject = async (id: string) => {
-    // 未保存の変更がある場合は確認ダイアログを表示
+    // 未保存の変更がある場合は3択ダイアログ（保存/破棄/キャンセル）を表示
     if (hasUnsavedChanges) {
-      const confirmed = await confirm(
-        "現在の編集内容は保存されていません。\nプロジェクトを切り替えますか？",
-      );
-      if (!confirmed) return;
+      const action = await confirmUnsaved({
+        title: "未保存の変更があります",
+        message: `現在のプロジェクト「${currentProjectName}」への変更を保存しますか？\n保存しない場合、編集内容は失われます。`,
+        saveLabel: "保存して切り替え",
+        discardLabel: "保存せずに切り替え",
+        cancelLabel: "キャンセル",
+      });
+
+      if (action === "cancel") return;
+      if (action === "save") {
+        const saveSuccess = await handleSaveProject();
+        if (!saveSuccess) return; // 保存キャンセルまたは失敗時は中断
+      }
     }
     try {
       const data = await loadProject(id);
@@ -698,6 +713,33 @@ function App() {
       console.error(err);
       await alert("プロジェクト名の変更に失敗しました");
     }
+  };
+
+  const handleNewProject = async () => {
+    // 未保存の変更がある場合は3択ダイアログ（保存/破棄/キャンセル）を表示
+    if (hasUnsavedChanges) {
+      const action = await confirmUnsaved({
+        title: "未保存の変更があります",
+        message: `現在のプロジェクト「${currentProjectName}」への変更を保存しますか？\n保存しない場合、編集内容は失われます。`,
+        saveLabel: "保存して新規作成",
+        discardLabel: "保存せずに新規作成",
+        cancelLabel: "キャンセル",
+      });
+
+      if (action === "cancel") return;
+      if (action === "save") {
+        const saveSuccess = await handleSaveProject();
+        if (!saveSuccess) return; // 保存キャンセルまたは失敗時は中断
+      }
+    }
+    setCurrentProjectId(null);
+    setCurrentProjectName("名称未設定プロジェクト");
+    setCommands([]);
+    setActiveCommandId(null);
+    setSelectedStrokeIndex(null);
+    setPastLevels([]);
+    setFutureLevels([]);
+    setSavedCommandsJSON(JSON.stringify([]));
   };
 
   // Helper to get next color
@@ -2999,7 +3041,6 @@ function App() {
         <Sidebar
           commands={commands}
           activeCommandId={activeCommandId}
-          hasUnsavedChanges={hasUnsavedChanges}
           onSelectCommand={setActiveCommandId}
           onDeleteCommand={(id) => {
             saveToHistory();
@@ -3064,19 +3105,11 @@ function App() {
           onAddTapAction={handleAddTapAction}
           onDeleteStroke={handleDeleteStroke}
           onDuplicateStroke={handleDuplicateStroke}
-
           canPasteAction={Boolean(selectedCommand) && Boolean(actionClipboard)}
           onBatchExport={handleBatchExport}
           onBatchDelete={handleBatchDelete}
           onSelectAll={handleSelectAllCommands}
           onClearSelection={handleClearCommandSelection}
-          currentProjectId={currentProjectId}
-          projectsList={projectsList}
-          onLoadProject={handleLoadProject}
-          onSaveProject={handleSaveProject}
-          onSaveAsProject={handleSaveAsProject}
-          onDeleteProject={handleDeleteProject}
-          onRenameProject={handleRenameProject}
         />
         {/* Close button for fullscreen popup mode */}
         {isFullscreen && isLeftSidebarOpen && (
@@ -3132,10 +3165,11 @@ function App() {
         */}
         {!isFullscreen && (
           <div className="h-12 bg-white border-b border-gray-200 flex items-center justify-between px-4 text-sm select-none">
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 sm:space-x-3">
               <button
                 onClick={() => setIsLeftSidebarOpen(!isLeftSidebarOpen)}
                 className="p-1.5 text-gray-500 hover:bg-gray-100 rounded transition-colors"
+                title={isLeftSidebarOpen ? "サイドバーを閉じる" : "サイドバーを開く"}
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -3151,7 +3185,7 @@ function App() {
                         strokeLinejoin="round"
                         strokeWidth={2}
                         d="M4 6h16M4 12h16M4 18h16"
-                      /> // Menu icon (open)
+                      />
                     ) : (
                       <path
                         strokeLinecap="round"
@@ -3159,16 +3193,35 @@ function App() {
                         strokeWidth={2}
                         d="M4 6h16M4 12h16M4 18h16"
                       />
-                    ) // Menu icon (closed) - keep same or change? Let's use Sidebar icon
+                    )
                   }
                 </svg>
               </button>
-              <h1 className="font-semibold text-gray-700 tracking-tight hidden sm:block">
+              <h1 className="font-semibold text-gray-700 tracking-tight hidden lg:block">
                 Voice Control Commander
               </h1>
-              <h1 className="font-semibold text-gray-700 tracking-tight sm:hidden text-xs truncate max-w-[100px]">
-                VCC
-              </h1>
+              <div className="h-4 w-px bg-gray-200 hidden sm:block" />
+              <ProjectMenu
+                currentProjectId={currentProjectId}
+                currentProjectName={currentProjectName}
+                projectsList={projectsList}
+                hasUnsavedChanges={hasUnsavedChanges}
+                onSaveProject={handleSaveProject}
+                onSaveAsProject={handleSaveAsProject}
+                onNewProject={handleNewProject}
+                onLoadProject={handleLoadProject}
+                onDeleteProject={handleDeleteProject}
+                onRenameProject={handleRenameProject}
+                onRenameCurrentProject={async () => {
+                  const newName = await prompt(
+                    "プロジェクト名:",
+                    currentProjectName,
+                  );
+                  if (newName && newName.trim()) {
+                    setCurrentProjectName(newName.trim());
+                  }
+                }}
+              />
             </div>
             <div className="flex items-center space-x-1 md:space-x-3">
               {/* Undo / Redo */}

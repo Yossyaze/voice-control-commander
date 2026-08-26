@@ -1,5 +1,5 @@
 import React from "react";
-import { MousePointerClick, Spline, Save, FilePen, Check } from "lucide-react";
+import { MousePointerClick, Spline } from "lucide-react";
 import {
   DndContext,
   closestCenter,
@@ -16,7 +16,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { Command, Point, ProjectSummary } from "../api";
+import type { Command, Point } from "../api";
 
 interface SidebarProps {
   commands: Command[];
@@ -60,16 +60,6 @@ interface SidebarProps {
   onCopyAction?: (index?: number) => void;
   onPasteAction?: (index?: number) => void;
   canPasteAction?: boolean;
-
-  // Project Management
-  currentProjectId: string | null;
-  projectsList: ProjectSummary[];
-  onLoadProject: (id: string) => void;
-  onSaveProject: () => void;
-  onSaveAsProject: () => void;
-  onDeleteProject: (id: string) => void;
-  onRenameProject: (id: string) => void;
-  hasUnsavedChanges: boolean;
 
   // New action handlers
   onAddLineAction: (commandId: string) => void;
@@ -938,14 +928,6 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
     onAddTapAction,
     onDeleteStroke,
     onDuplicateStroke,
-    currentProjectId,
-    projectsList,
-    onLoadProject,
-    onSaveProject,
-    onSaveAsProject,
-    onDeleteProject,
-    onRenameProject,
-    hasUnsavedChanges,
   } = props;
 
   const [editingId, setEditingId] = React.useState<string | null>(null);
@@ -985,144 +967,6 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
 
   return (
     <div className="w-64 bg-white flex flex-col h-full border-r border-gray-300 font-sans shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)] z-10">
-      {/* プロジェクトヘッダー */}
-      <div className="px-4 py-3 border-b border-gray-300 bg-gray-50 flex flex-col space-y-2 shrink-0">
-        {/* 現在のプロジェクト名 + 保存ボタン */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center min-w-0 flex-1">
-            <span className="text-[9px] text-gray-400 uppercase tracking-wider mr-1.5 shrink-0">
-              PRJ
-            </span>
-            <span
-              className="text-sm font-bold text-gray-800 truncate cursor-pointer hover:text-blue-600"
-              onClick={() => {
-                if (currentProjectId) onRenameProject(currentProjectId);
-              }}
-              title={currentProjectId ? "クリックして名前を変更" : ""}
-            >
-              {currentProjectId
-                ? projectsList.find((p) => p.id === currentProjectId)?.name ||
-                  "不明"
-                : "未保存"}
-            </span>
-          </div>
-          <div className="flex items-center space-x-1 shrink-0">
-            <button
-              onClick={
-                hasUnsavedChanges || !currentProjectId
-                  ? onSaveProject
-                  : undefined
-              }
-              className={`text-[10px] font-medium px-2 py-1 rounded transition-colors border flex items-center space-x-1 ${
-                hasUnsavedChanges || !currentProjectId
-                  ? "text-blue-600 bg-blue-50 hover:bg-blue-100 border-blue-200 shadow-sm"
-                  : "text-gray-500 bg-gray-50 border-gray-200 opacity-70 cursor-default"
-              }`}
-              title={
-                hasUnsavedChanges || !currentProjectId
-                  ? "現在の状態を上書き保存"
-                  : "変更はありません"
-              }
-            >
-              {hasUnsavedChanges || !currentProjectId ? (
-                <>
-                  <Save className="w-3 h-3" />
-                  <span>保存</span>
-                </>
-              ) : (
-                <>
-                  <Check className="w-3 h-3" />
-                  <span>保存済</span>
-                </>
-              )}
-            </button>
-            <button
-              onClick={onSaveAsProject}
-              className="text-[10px] font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded transition-colors flex items-center space-x-1 shadow-sm"
-              title="名前を付けて新しいプロジェクトとして保存"
-            >
-              <FilePen className="w-3 h-3" />
-              <span>別名保存</span>
-            </button>
-          </div>
-        </div>
-
-        {/* 保存済みプロジェクト一覧 */}
-        {projectsList.length > 0 && (
-          <div className="space-y-1 max-h-32 overflow-y-auto">
-            {projectsList.map((p) => (
-              <div
-                key={p.id}
-                className={`flex items-center justify-between rounded px-2 py-1.5 group transition-colors cursor-pointer ${
-                  p.id === currentProjectId
-                    ? "bg-blue-100 border border-blue-300"
-                    : "bg-white border border-gray-200 hover:border-blue-300"
-                }`}
-                onClick={() => {
-                  if (p.id !== currentProjectId) onLoadProject(p.id);
-                }}
-              >
-                <span
-                  className={`text-xs truncate flex-1 ${
-                    p.id === currentProjectId
-                      ? "font-bold text-blue-800"
-                      : "text-gray-700"
-                  }`}
-                >
-                  {p.name}
-                </span>
-                {/* 操作ボタン（常に表示） */}
-                <div className="flex items-center space-x-0.5 transition-opacity shrink-0 ml-1">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRenameProject(p.id);
-                    }}
-                    className="p-1 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-colors"
-                    title="名前を変更"
-                  >
-                    <svg
-                      className="w-3 h-3"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                      />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteProject(p.id);
-                    }}
-                    className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                    title="削除"
-                  >
-                    <svg
-                      className="w-3 h-3"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
       <div className="h-12 px-4 border-b border-gray-300 bg-gray-50 flex items-center justify-between shrink-0">
         <h2 className="text-xs font-bold text-gray-600 tracking-wider uppercase">
           コマンド
